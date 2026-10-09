@@ -575,10 +575,17 @@ function drawDecs(){
 }
 
 /* === 10б. МОНЕТЫ И ПРЕПЯТСТВИЯ === */
-function coinIcon(x,y,r){fl('#c98a00');dot(x,y,r);fl('#ffd84d');dot(x,y,r*.76);fl('#fff6a8');dot(x-r*.28,y-r*.28,r*.2);}
+var COIN=new Image();COIN.src='img/coin.png';     // монета NIS
+function coinOk(){return COIN.complete&&COIN.naturalWidth>0;}
+function coinIcon(x,y,r){
+ if(coinOk()){g.drawImage(COIN,x-r,y-r,r*2,r*2);return;}
+ fl('#c98a00');dot(x,y,r);fl('#ffd84d');dot(x,y,r*.76);fl('#fff6a8');dot(x-r*.28,y-r*.28,r*.2);}
 function drawCoin(x,y,s,ph){                  // вращающийся тиын над дорогой
  var r=s*.13,cy=y-r*2+sin(T*4+ph)*r*.3,sc=mx(.15,abs(cos(T*4.5+ph)));
  fl('rgba(0,0,0,.16)');g.beginPath();g.ellipse(x,y,r*.75,r*.2,0,0,TAU);g.fill();
+ if(coinOk()){var ed=r*.14*(1-sc);                // ребро монеты видно, когда она повёрнута боком
+  if(ed>.5){fl('#b97a08');g.beginPath();g.ellipse(x+ed,cy,r*sc,r,0,0,TAU);g.fill();}
+  g.drawImage(COIN,x-r*sc,cy-r,r*2*sc,r*2);return;}
  fl('#c98a00');g.beginPath();g.ellipse(x,cy,r*sc,r,0,0,TAU);g.fill();
  fl('#ffd84d');g.beginPath();g.ellipse(x,cy,r*.76*sc,r*.76,0,0,TAU);g.fill();
  if(r>4){fl('#e7a91c');g.beginPath();g.ellipse(x,cy,r*.3*sc,r*.3,0,0,TAU);g.fill();}
