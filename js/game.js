@@ -16,6 +16,12 @@ var SETS=[
 /* === 2. СОСТОЯНИЕ И ГЕОМЕТРИЯ ПЕРСПЕКТИВЫ === */
 var cv=document.getElementById('c'),g=cv.getContext('2d');
 var W=0,H=0,U=0,cx=0,hzY=0,baseY=0,rHalf=0,LW=0,vign=null,T=0;
+// LAND — телефон в альбоме (низкий экран): интерфейс раскладывается в две колонки
+// SA — отступы под вырез и полоску «домой» (CSS env(safe-area-inset-*))
+var LAND=false,SA={t:0,r:0,b:0,l:0},saEl=document.createElement('div');
+saEl.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;'+
+ 'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+document.body.appendChild(saEl);
 var mn=Math.min,mx=Math.max,rnd=Math.random,sin=Math.sin,cos=Math.cos,abs=Math.abs,PI=Math.PI;
 var DEPTH=10,SPAWN_Z=72,PLR_Z=2,SEG=6,BANDS=42,TAU=6.2832,JUMP=.8,DAYLEN=28;
 var SPDUP=.3,SPDMAX=62;   // разгон в секунду и предел скорости (старт — в SETS)
@@ -108,6 +114,9 @@ function resize(){
  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
  g.setTransform(dpr,0,0,dpr,0,0);
  U=mn(W,H);cx=W/2;hzY=H*.34;baseY=H*1.06;
+ LAND=W>H*1.25&&H<560;
+ try{var cs=getComputedStyle(saEl);SA.t=parseFloat(cs.paddingTop)||0;SA.r=parseFloat(cs.paddingRight)||0;
+  SA.b=parseFloat(cs.paddingBottom)||0;SA.l=parseFloat(cs.paddingLeft)||0;}catch(e){}
  rHalf=mn(W*.47,H*.62);LW=rHalf*2/3;
  vign=g.createRadialGradient(W/2,H*.5,U*.45,W/2,H*.5,mx(W,H)*.78);
  vign.addColorStop(0,'rgba(5,10,35,0)');vign.addColorStop(1,'rgba(5,10,35,.38)');
@@ -648,7 +657,7 @@ function drawGate(){
  fl('#1d3557');dot(cx,my,mr);fl('#ffd35a');dot(cx,my,mr*.78);
  if(mr>3){g.save();g.globalAlpha*=cl((mr-3)/4);g.translate(cx,my+mr*.06);g.scale(mr*1.2/GREF,mr*1.2/GREF);
   fl('#1d3557');g.font=F(GREF,900);center();g.fillText('?',0,0);g.restore();}
- var sh=H*.16*p,sw=LW*.88*p,sy=gy-topH+beam;
+ var sh=H*.16*p,sw=LW*.94*p,sy=gy-topH+beam;
  if(sh<4||sw<6)return;
  center();
  for(var i=0;i<3;i++){
@@ -664,7 +673,7 @@ function drawGate(){
   sk(sel&&near>0?'#ffe14d':'rgba(255,255,255,.95)',mx(1,sh*(sel&&near>0?.09:.06)));g.stroke();
   fl('rgba(255,255,255,.22)');rr(-sw/2+sh*.12,by+sh*.08,sw-sh*.24,sh*.3,sh*.15);g.fill();
   // текст рисуется эталонным шрифтом и плавно масштабируется: целые px у мелкого шрифта давали дрожание
-  g.font=F(GREF,900);var tw=g.measureText(gate.words[i]).width,fs=mn(sh*.5,sw*.86*GREF/tw);
+  g.font=F(GREF,900);var tw=g.measureText(gate.words[i]).width,fs=mn(sh*.54,sw*.88*GREF/tw);
   if(fs>=2.5){
    g.save();g.globalAlpha*=cl((fs-2.5)/5);       // вдали текст проявляется, а не выскакивает
    g.translate(0,by+sh/2);g.scale(fs/GREF,fs/GREF);
@@ -783,10 +792,10 @@ function wrap(text,maxW,fs,weight,out){
 function full(p){return p.text.replace('____',p.answer);}
 
 function drawBanner(){
- var top=mx(8,H*.014);
+ var top=mx(8,H*.014)+SA.t;
  if(!S.cur)return top;
  var str=(S.fb>0)?full(S.cur):S.cur.text;
- var bw=mn(W-16,860),bx=(W-bw)/2,pad=bw*.045,key=str+'|'+W+'|'+H;
+ var bw=mn(W-16-SA.l-SA.r,860),bx=(W-bw)/2,pad=bw*.045,key=str+'|'+W+'|'+H;
  if(banner.key!==key){
   var fs=mn(W*.052,H*.042,34);
   wrap(str,bw-pad*2,fs,800,banner.lines);
@@ -820,7 +829,7 @@ function heart(x,y,s,on){
 }
 function pill(x,y,w,h){fl('rgba(12,24,52,.5)');rr(x,y,w,h,h/2);g.fill();sk('rgba(255,255,255,.28)',1.5);g.stroke();}
 function drawHUD(){
- var rowY=drawBanner()+mx(8,H*.014),fs=mn(U*.045,22),ph=fs*1.8,m=mx(10,W*.03),i;
+ var rowY=drawBanner()+mx(8,H*.014),fs=mn(mx(U*.045,15),22),ph=fs*1.8,m=mx(10,W*.03)+mx(SA.l,SA.r),i;
  var hs=fs*.62,step=hs*2.5;
  pill(m,rowY,step*3+hs*.9,ph);
  for(i=0;i<3;i++){
@@ -842,7 +851,7 @@ function drawHUD(){
  pill(px,rowY,pw,ph);
  fl('#ffd84d');starPath(px+fs*1.05,rowY+ph/2,fs*.55,fs*.24);g.fill();
  g.textAlign='right';g.textBaseline='middle';fl('#fff');g.fillText(st,W-m-fs*.7,rowY+ph/2+1);
- g.font=F(fs*.62,800);fl('rgba(255,255,255,.85)');
+ g.font=F(mx(11,fs*.7),800);fl('rgba(255,255,255,.9)');
  sk('rgba(10,20,45,.6)',fs*.18);g.lineJoin='round';
  g.strokeText('Рекорд: '+S.best,W-m-fs*.3,rowY+ph+fs*.6);g.fillText('Рекорд: '+S.best,W-m-fs*.3,rowY+ph+fs*.6);
  if(!SETS[S.set].endless){                         // прогресс уровня
@@ -875,7 +884,7 @@ function drawCountdown(){
 }
 function drawSndBtn(){
  var r=mx(18,U*.045),m=mx(12,U*.035);
- sndBtn.x=W-m-r*2;sndBtn.y=H-m-r*2;sndBtn.w=r*2;sndBtn.h=r*2;
+ sndBtn.x=W-m-r*2-SA.r;sndBtn.y=H-m-r*2-SA.b;sndBtn.w=r*2;sndBtn.h=r*2;
  var x=sndBtn.x+r,y=sndBtn.y+r;
  fl('rgba(12,24,52,.55)');dot(x,y,r);
  sk('rgba(255,255,255,.35)',1.5);g.stroke();
@@ -958,8 +967,42 @@ function drawCard(i,x,y,w,h){
   g.beginPath();g.moveTo(bx-br*.45,by);g.lineTo(bx-br*.1,by+br*.38);g.lineTo(bx+br*.5,by-br*.35);g.stroke();}
  g.restore();
 }
+// Главный экран в альбоме: слева название и кнопки, справа выбор героя и карты
+function drawStartLand(){
+ var L=SA.l+W*.03,R=W-SA.r-W*.03,lc=L+(R-L)*.22,rc=L+(R-L)*.71,cwR=(R-L)*.54,lw=(R-L)*.4,k;
+ var top=mx(10,H*.04)+SA.t,bot=H-mx(10,H*.04)-SA.b,hh=bot-top;
+ // левая колонка
+ var ts=mn(hh*.2,lw*.3,84),sfs=mn(hh*.055,20),bh=mn(hh*.15,62);
+ var blk=ts*2.45+sfs*3.1+bh*2.07;                 // высота левой колонки — центрируем и при нехватке ужимаем
+ if(blk>hh){var f0=hh/blk;ts*=f0;sfs*=f0;bh*=f0;blk=hh;}
+ var y=top+(hh-blk)/2+ts*.55;
+ g.save();g.translate(lc-W/2,0);
+ titleText('Зерде',y,ts,'#ffffff','#bfe4ff',0);y+=ts*1.05;
+ titleText('Run',y,ts,'#ffe066','#ff7a3d',1);
+ g.restore();y+=ts*.85;
+ var s1='Дұрыс сөзден өт,',s2='тиын жина, тастан секір!';sfs=fit(s2,sfs,800,lw*.92);
+ center();fl('rgba(255,255,255,.92)');g.font=F(sfs,800);g.fillText(s1,lc,y);g.fillText(s2,lc,y+sfs*1.25);y+=sfs*3.1;
+ var bw=mn(lw*.9,300);
+ ui.btn.x=lc-bw/2;ui.btn.y=y;ui.btn.w=bw;ui.btn.h=bh;
+ drawBtn(ui.btn,'Бастау','#ffd166','#ff9f1c','#c96a0a',!S.help);y+=bh*1.35;
+ var hh2=bh*.72,hl='?  Қалай ойнау';g.font=F(hh2*.42,900);
+ var hw=g.measureText(hl).width+hh2*1.4,hR=ui.help;hR.x=lc-hw/2;hR.y=y;hR.w=hw;hR.h=hh2;
+ pill(hR.x,hR.y,hw,hh2);center();fl('#fff');g.fillText(hl,lc,y+hh2/2+1);
+ // правая колонка
+ var lab=mn(hh*.055,22),gap=mn(hh*.035,14),mh=mn(hh*.2,cwR*.26),chh=hh-lab*3.6-gap*2-mh;
+ var cw=mn(chh/1.08,(cwR-gap)/2);chh=mn(chh,cw*1.3);
+ var ry=top+(hh-(lab*3.6+gap*2+chh+mh))/2,slide=(1-eob(cl(S.scrT*2.2)))*H*.15;
+ center();fl('#ffd84d');g.font=F(lab,900);g.fillText('Кейіпкерді таңда',rc,ry+lab*.6);ry+=lab*1.5;
+ g.save();g.translate(0,slide);
+ for(k=0;k<NAMES.length;k++)drawCard(k,rc-cw-gap/2+k*(cw+gap),ry,cw,chh);
+ g.restore();ry+=chh+gap*1.5;
+ center();fl('#ffd84d');g.font=F(lab,900);g.fillText('Картаны таңда',rc,ry+lab*.6);ry+=lab*1.5;
+ var mw=mn(mh*1.75,(cwR-gap)/2);
+ for(k=0;k<MAPS.length;k++)drawMapCard(k,rc-mw-gap/2+k*(mw+gap),ry,mw,mh);
+}
 function drawStart(){
  overlay(.55,.3);
+ if(LAND){g.globalAlpha=cl(S.scrT*3);drawStartLand();g.globalAlpha=1;if(S.help)drawHelp();return;}
  g.globalAlpha=cl(S.scrT*3);
  var ts=fit('Зерде',mn(W*.16,H*.095,84),900,W*.86),y=mx(ts*.9,H*.1);
  titleText('Зерде',y,ts,'#ffffff','#bfe4ff',0);y+=ts*1.08;
@@ -1037,23 +1080,27 @@ function helpIcon(k,x,y,s){
  else{fl('#ffc21a');starPath(x,y,s*.36,s*.16);g.fill();sk('#c98a00',mx(1.5,s*.05));g.stroke();}
 }
 function drawHelp(){
- var a=eob(cl(S.helpT*3));
+ var a=eob(cl(S.helpT*3)),cols=LAND?2:1,nr=Math.ceil(HELP.length/cols);   // в альбоме — две колонки
  g.globalAlpha=cl(S.helpT*4);fl('rgba(6,12,30,.7)');fr(0,0,W,H);
- var w=mn(W*.92,560),fsT=fit('Қалай ойнау керек?',mn(w*.075,40),900,w*.85),fs=mn(w*.042,H*.028,19);
- var row=mx(fs*2.6,mn(H*.075,64)),bh=mn(H*.075,56),h=fsT*2+HELP.length*row+bh*1.9;
- if(h>H*.94){row*=(H*.94-fsT*2-bh*1.9)/(HELP.length*row);h=H*.94;}
+ var w=LAND?mn(W-SA.l-SA.r-W*.06,900):mn(W*.92,560),cw=w/cols;
+ var fsT=fit('Қалай ойнау керек?',mn(w*.075,LAND?H*.075:40,40),900,w*.85),fs=LAND?mn(cw*.042,19):mn(w*.042,H*.028,19);
+ var bh=LAND?mn(H*.12,52):mn(H*.075,56),hmax=H*.94-SA.t-SA.b;
+ var row=mx(fs*2.6,mn(H*.075,64)),h=fsT*2+nr*row+bh*1.9;
+ if(LAND)row=mn(row*1.25,(hmax-fsT*2-bh*1.9)/nr),h=fsT*2+nr*row+bh*1.9;
+ if(h>hmax){row*=(hmax-fsT*2-bh*1.9)/(nr*row);h=hmax;}
+ if(LAND)fs=mn(fs,row*.3);
  var x=(W-w)/2,y=(H-h)/2;
  g.save();g.translate(W/2,H/2);g.scale(.85+.15*a,.85+.15*a);g.translate(-W/2,-H/2);
- fl('rgba(0,0,0,.3)');rr(x,y+h*.015,w,h,w*.05);g.fill();
+ fl('rgba(0,0,0,.3)');rr(x,y+h*.015,w,h,mn(w*.05,28));g.fill();
  var gr=g.createLinearGradient(0,y,0,y+h);gr.addColorStop(0,'#fffaf0');gr.addColorStop(1,'#ffe9bf');
- fl(gr);rr(x,y,w,h,w*.05);g.fill();sk('#ff9f1c',mx(3,w*.008));g.stroke();
+ fl(gr);rr(x,y,w,h,mn(w*.05,28));g.fill();sk('#ff9f1c',mx(3,w*.008));g.stroke();
  center();fl('#1d3557');g.font=F(fsT,900);g.fillText('Қалай ойнау керек?',W/2,y+fsT*1.05);
- var iy=y+fsT*2,ic=mn(row*.8,fs*2.4),tx=x+w*.06+ic*1.25;
- for(var i=0;i<HELP.length;i++){var cy=iy+row*(i+.5);
-  fl(i%2?'rgba(255,159,28,.08)':'rgba(35,131,201,.08)');rr(x+w*.03,cy-row*.46,w*.94,row*.92,row*.25);g.fill();
-  helpIcon(HELP[i][0],x+w*.06+ic*.55,cy,ic);
-  fl('#ff9f1c');g.font=F(fs*.9,900);g.textAlign='left';g.textBaseline='middle';
-  var t=HELP[i][1],maxW=x+w*.95-tx;g.font=F(fit(t,fs,700,maxW*1.9),700);fl('#2a3b55');
+ var iy=y+fsT*2,ic=mn(row*.8,fs*2.4);
+ for(var i=0;i<HELP.length;i++){var c=Math.floor(i/nr),cy=iy+row*(i%nr+.5),x0=x+c*cw,tx=x0+cw*.06+ic*1.25;
+  fl(i%2?'rgba(255,159,28,.08)':'rgba(35,131,201,.08)');rr(x0+cw*.03,cy-row*.46,cw*.94,row*.92,row*.25);g.fill();
+  helpIcon(HELP[i][0],x0+cw*.06+ic*.55,cy,ic);
+  g.textAlign='left';g.textBaseline='middle';
+  var t=HELP[i][1],maxW=x0+cw*.95-tx;g.font=F(fit(t,fs,700,maxW*1.9),700);fl('#2a3b55');
   if(g.measureText(t).width<=maxW)g.fillText(t,tx,cy);
   else{var ws=t.split(' '),l1='',k2=0;              // перенос на две строки
    for(k2=0;k2<ws.length;k2++){var tt=l1?l1+' '+ws[k2]:ws[k2];if(g.measureText(tt).width>maxW)break;l1=tt;}
@@ -1072,11 +1119,15 @@ function drawMode(){
  g.globalAlpha=cl(S.scrT*3);
  var ts=fit('Санатты таңда',mn(W*.1,H*.065,56),900,W*.86),y=mx(ts*.9,H*.09),k,j;
  titleText('Санатты таңда',y,ts,'#ffffff','#bfe4ff',0);y+=ts*.95;
- var bw=mn(W*.88,480),bh=mn(H*.1,72,U*.18),gp=bh*.3,x=(W-bw)/2;
- var need=bh*4+gp*4+bh*.6+bh*.75,room=H-y-mx(12,H*.03);
- if(need>room){var f=room/need;bh*=f;gp*=f;}
+ var bw=mn(W*.88,480),bh=mn(H*.1,72,U*.18),gp=bh*.3,x=(W-bw)/2,y0;
+ if(LAND){bw=mn((W-SA.l-SA.r)*.44,420);gp=mn(H*.04,16);    // альбом: сетка 2×2
+  bh=mn(76,(H-y-gp*3-mx(12,H*.03))/2.75);x=W/2-bw-gp/2;}
+ else{var need=bh*4+gp*4+bh*.6+bh*.75,room=H-y-mx(12,H*.03);
+  if(need>room){var f=room/need;bh*=f;gp*=f;}}
+ y0=y;
  for(k=0;k<SETS.length;k++){
-  if(k===1){center();fl('#ffd84d');g.font=F(bh*.32,900);g.fillText('Фразеологизмдер',W/2,y+bh*.28);y+=bh*.6;}
+  if(LAND){x=W/2-bw-gp/2+(k%2)*(bw+gp);y=y0+Math.floor(k/2)*(bh+gp);}
+  else if(k===1){center();fl('#ffd84d');g.font=F(bh*.32,900);g.fillText('Фразеологизмдер',W/2,y+bh*.28);y+=bh*.6;}
   var st=SETS[k],r=ui.modes[k],e=eob(cl(S.scrT*3.5-k*.2)),sel=k===S.modeSel;
   r.x=x;r.y=y;r.w=bw;r.h=bh;
   g.save();g.translate((1-e)*W*.5,0);
@@ -1096,26 +1147,30 @@ function drawMode(){
   y+=bh+gp;
  }
  var b=ui.back;b.w=mn(bw*.45,200);b.h=bh*.72;b.x=(W-b.w)/2;b.y=y+gp*.2;
+ if(LAND){b.w=mn(bw*.5,220);b.x=(W-b.w)/2;}
  drawBtn(b,'← Артқа','#c3cfe0','#8a9bb5','#5d6e88',false);
  g.globalAlpha=1;
 }
 function drawOver(){
  overlay(.6,.45);
  var w=mn(W*.94,560),h=mn(H*.94,w*1.5),top=(H-h)/2,e=eob(cl(S.scrT*2.8)),k;
+ // в альбоме карточка шире и делится на две колонки: слева итог, справа статистика и кнопки
+ if(LAND){w=mn(W-SA.l-SA.r-W*.06,820);h=H*.92-SA.t-SA.b;top=(H-h)/2;}
+ var Hh=LAND?h*1.55:h,cw=LAND?w/2:w,cxL=LAND?W/2-w/4:W/2,cxR=LAND?W/2+w/4:W/2,CX=cxL;
  g.save();g.translate(W/2,H/2);g.scale(e,e);g.translate(-W/2,-H/2);
  var x=(W-w)/2;
  fl('rgba(0,0,0,.3)');rr(x,top+8,w,h,U*.05);g.fill();
  var pg=g.createLinearGradient(0,top,0,top+h);pg.addColorStop(0,'#ffffff');pg.addColorStop(1,'#e8f0ff');
  fl(pg);rr(x,top,w,h,U*.05);g.fill();sk('rgba(255,255,255,.9)',3);g.stroke();
  center();
- var y=top+h*.075,st=SETS[S.set];
- fl(S.won?'#2e9d4a':'#e0403a');g.font=F(mn(w*.085,h*.058),900);g.fillText(S.won?'Жарайсың!':'Ойын аяқталды',W/2,y);
- y+=h*.055;fl('#7a8aa0');g.font=F(mn(w*.036,h*.026),800);
- g.fillText(st.endless?st.name:(S.won?'Деңгей өтілді • ':'')+'Фразеологизм • '+st.name,W/2,y);
- y+=h*.085;
- var sr=mn(w*.07,h*.048),earned=S.earned;
+ var y=top+Hh*.075,st=SETS[S.set];
+ fl(S.won?'#2e9d4a':'#e0403a');g.font=F(mn(w*.085,Hh*.058),900);g.fillText(S.won?'Жарайсың!':'Ойын аяқталды',CX,y);
+ y+=Hh*.055;fl('#7a8aa0');g.font=F(mn(w*.036,Hh*.026),800);
+ g.fillText(st.endless?st.name:(S.won?'Деңгей өтілді • ':'')+'Фразеологизм • '+st.name,CX,y);
+ y+=Hh*.085;
+ var sr=mn(w*.07,Hh*.048),earned=S.earned;
  for(k=0;k<3;k++){                                 // звёзды появляются по очереди
-  var q=cl((S.scrT-.4-k*.25)*4),big=k===1?1.25:1,sx=W/2+(k-1)*sr*2.7,sy=y-(k===1?sr*.3:0);
+  var q=cl((S.scrT-.4-k*.25)*4),big=k===1?1.25:1,sx=CX+(k-1)*sr*2.7,sy=y-(k===1?sr*.3:0);
   fl('#d5dbe5');starPath(sx,sy,sr*big,sr*big*.45);g.fill();
   if(k<earned&&q>0){
    if(S.starSnd<=k){S.starSnd=k+1;sfxStar(k);burst(sx,sy,12,['#ffd84d','#fff6a8'],U*.4,1,U*.012,U*.5);}
@@ -1125,44 +1180,45 @@ function drawOver(){
   }
  }
  y+=sr*1.9;
- fl('#7a8aa0');g.font=F(mn(w*.035,h*.026),900);g.fillText('ҰПАЙ',W/2,y);y+=h*.055;
- fl('#1d3557');g.font=F(mn(w*.13,h*.085),900);
- g.fillText(String(Math.round(S.score*cl((S.scrT-.3)/1))),W/2,y);y+=h*.075;
+ fl('#7a8aa0');g.font=F(mn(w*.035,Hh*.026),900);g.fillText('ҰПАЙ',CX,y);y+=Hh*.055;
+ fl('#1d3557');g.font=F(mn(w*.13,Hh*.085),900);
+ g.fillText(String(Math.round(S.score*cl((S.scrT-.3)/1))),CX,y);y+=Hh*.075;
  if(S.newBest){
-  var bs=1+sin(T*6)*.05,bt='ЖАҢА РЕКОРД!';g.font=F(mn(w*.045,h*.032),900);
-  var bw=g.measureText(bt).width+w*.08,bh=mn(w*.045,h*.032)*1.8;
-  g.save();g.translate(W/2,y);g.scale(bs,bs);g.rotate(-.03);
+  var bs=1+sin(T*6)*.05,bt='ЖАҢА РЕКОРД!';g.font=F(mn(w*.045,Hh*.032),900);
+  var bw=g.measureText(bt).width+w*.08,bh=mn(w*.045,Hh*.032)*1.8;
+  g.save();g.translate(CX,y);g.scale(bs,bs);g.rotate(-.03);
   var bg=g.createLinearGradient(-bw/2,0,bw/2,0);bg.addColorStop(0,'#ff3d8a');bg.addColorStop(1,'#ff9f1c');
   fl(bg);rr(-bw/2,-bh/2,bw,bh,bh/2);g.fill();fl('#fff');g.fillText(bt,0,1);
   g.restore();
- }else{fl('#5a6b80');g.font=F(mn(w*.042,h*.03),800);g.fillText('Рекорд: '+S.best,W/2,y);}
- y+=h*.065;
- fl('#2e9d4a');g.font=F(mn(w*.04,h*.03),800);
- g.fillText('Дұрыс: '+S.correct+(st.endless?'':'/'+st.items.length)+'   •   Ең ұзақ комбо: '+S.maxCombo,W/2,y);y+=h*.05;
- var ct='Тиын: '+S.coins+'   •   Барлығы: '+S.coinTotal,cfs=mn(w*.04,h*.03);g.font=F(cfs,800);
- var ctw=g.measureText(ct).width;coinIcon(W/2-ctw/2-cfs*.8,y,cfs*.55);
- fl('#c98a00');g.fillText(ct,W/2+cfs*.1,y);y+=h*.06;
- var bh2=mn(h*.1,58),btnY=top+h-bh2-h*.06,fsI=mn(w*.034,h*.027);
+ }else{fl('#5a6b80');g.font=F(mn(w*.042,Hh*.03),800);g.fillText('Рекорд: '+S.best,CX,y);}
+ y+=Hh*.065;
+ if(LAND){CX=cxR;y=top+Hh*.075;}
+ fl('#2e9d4a');g.font=F(mn(w*.04,Hh*.03),800);
+ g.fillText('Дұрыс: '+S.correct+(st.endless?'':'/'+st.items.length)+'   •   Ең ұзақ комбо: '+S.maxCombo,CX,y);y+=Hh*.05;
+ var ct='Тиын: '+S.coins+'   •   Барлығы: '+S.coinTotal,cfs=mn(w*.04,Hh*.03);g.font=F(cfs,800);
+ var ctw=g.measureText(ct).width;coinIcon(CX-ctw/2-cfs*.8,y,cfs*.55);
+ fl('#c98a00');g.fillText(ct,CX+cfs*.1,y);y+=Hh*.06;
+ var bh2=mn(Hh*.1,58),btnY=top+h-bh2-Hh*.06,fsI=mn(w*.034,Hh*.027);
  var key=S.set+':'+S.mistakes.join(',')+'|'+W+'|'+H;
  if(overC.key!==key){                       // список ошибок готовится один раз
   overC.lines.length=0;
   var tmp=[];
   for(var i=0;i<S.mistakes.length&&i<4;i++){
-   wrap('• '+full(st.items[S.mistakes[i]]),w*.86,fsI,700,tmp);
+   wrap('• '+full(st.items[S.mistakes[i]]),cw*.86,fsI,700,tmp);
    for(var j=0;j<tmp.length&&j<2;j++)overC.lines.push(tmp[j]);
   }
   overC.key=key;
  }
  if(overC.lines.length){
-  var room=Math.floor((btnY-y-h*.04)/(fsI*1.3))-1;
+  var room=Math.floor((btnY-y-Hh*.04)/(fsI*1.3))-1;
   if(room>0){
-   fl('#c0661a');g.font=F(mn(w*.038,h*.029),900);
-   g.fillText(st.miss,W/2,y);y+=fsI*1.5;
+   fl('#c0661a');g.font=F(mn(w*.038,Hh*.029),900);
+   g.fillText(st.miss,CX,y);y+=fsI*1.5;
    fl('#3c4a5c');g.font=F(fsI,700);
-   for(k=0;k<overC.lines.length&&k<room;k++){g.fillText(overC.lines[k],W/2,y);y+=fsI*1.3;}
+   for(k=0;k<overC.lines.length&&k<room;k++){g.fillText(overC.lines[k],CX,y);y+=fsI*1.3;}
   }
  }
- var b1w=w*.54,b2w=w*.32,gx=w*.04,bx0=W/2-(b1w+b2w+gx)/2;
+ var b1w=cw*.54,b2w=cw*.32,gx=cw*.04,bx0=CX-(b1w+b2w+gx)/2;
  ui.btn.x=bx0;ui.btn.y=btnY;ui.btn.w=b1w;ui.btn.h=bh2;
  ui.btn2.x=bx0+b1w+gx;ui.btn2.y=btnY;ui.btn2.w=b2w;ui.btn2.h=bh2;
  if(S.nextSet>=0)drawBtn(ui.btn,'Келесі деңгей','#8be07a','#3fae4a','#2a7a32',S.scrT>.8);
@@ -1247,6 +1303,8 @@ cv.addEventListener('pointerup',function(e){
 },{passive:false});
 cv.addEventListener('pointercancel',function(){track=false;});
 cv.addEventListener('contextmenu',function(e){e.preventDefault();});
+['gesturestart','gesturechange','dblclick'].forEach(function(ev){   // iOS: без жестового и двойного зума
+ document.addEventListener(ev,function(e){e.preventDefault();},{passive:false});});
 
 /* === 17. ЦИКЛ С DELTA TIME === */
 var last=0;
