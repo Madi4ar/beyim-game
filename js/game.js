@@ -126,17 +126,42 @@ function sfxOk(){tone(660,660,0,.1,'triangle',.22);tone(990,990,.09,.16,'triangl
 function sfxCombo(){tone(660,660,0,.09,'triangle',.2);tone(880,880,.08,.09,'triangle',.2);
  tone(1100,1100,.16,.09,'triangle',.2);tone(1320,1320,.24,.22,'triangle',.2);}
 function sfxBad(){tone(200,90,0,.3,'sawtooth',.18);}
-function sfxOver(){tone(440,440,0,.16,'square',.15);tone(330,330,.16,.16,'square',.15);tone(220,160,.32,.4,'square',.15);}
-function sfxWin(){tone(523,523,0,.12,'triangle',.2);tone(659,659,.12,.12,'triangle',.2);
- tone(784,784,.24,.12,'triangle',.2);tone(1046,1046,.36,.35,'triangle',.22);}
-function sfxJump(){tone(380,820,0,.18,'sine',.12);}
+function sfxOver(){musicStop();playS('fail');}
+function sfxWin(){musicStop();playS('win');           // победная мелодия вместо фона, затем радость героя
+ var c=S.ch===2?'bcheer':S.ch===3?'zcheer':'';if(c)setTimeout(function(){if(S.screen==='over')playS(c);},450);}
+function sfxJump(){if(S.ch===2)playS('bjump');else if(S.ch===3)playS('zjump');else tone(380,820,0,.18,'sine',.12);}
 function sfxMove(){tone(420,640,0,.07,'sine',.08);}
 function sfxTick(){tone(660,660,0,.1,'square',.08);}
 function sfxGo(){tone(880,1320,0,.28,'triangle',.2);}
 function sfxSelect(){tone(520,880,0,.13,'triangle',.16);}
 function sfxStar(n){tone(880+n*220,880+n*220,0,.18,'triangle',.14);}
-function sfxCoin(){tone(988,988,0,.06,'square',.07);tone(1319,1319,.06,.12,'square',.07);}
-function sfxHit(){tone(160,70,0,.25,'square',.16);tone(90,60,0,.3,'sawtooth',.12);}
+function sfxCoin(){playS('coin');}
+function sfxHit(){playS('hit');}
+
+/* --- Звуковые файлы (sound/): HTMLAudio работает и при открытии index.html с диска ---
+   у каждого эффекта небольшой пул копий, чтобы частые звуки (монеты) накладывались */
+var SFX={},MUS=null,MUS_FROM=15;                 // фоновая музыка стартует с 15-й секунды
+function mkAudio(f,v){var a=new Audio('sound/'+f);a.preload='auto';a.volume=v;return a;}
+function sfxFile(k,f,v,n){var p=[];for(var i=0;i<n;i++)p.push(mkAudio(f,v));SFX[k]={p:p,i:0};}
+sfxFile('coin','coin.wav',.45,6);sfxFile('hit','hit.wav',.8,2);sfxFile('fail','fail.wav',.8,1);
+sfxFile('win','victory.wav',.75,1);sfxFile('bjump','batyr_jump.wav',.9,2);sfxFile('zjump','zhuyrik_jump.wav',.9,2);
+sfxFile('bcheer','batyr_cheer.mp3',.9,1);sfxFile('zcheer','zhuyrik_cheer.mp3',.9,1);
+function aPlay(a){try{var pr=a.play();if(pr&&pr.catch)pr.catch(function(){});}catch(e){}}
+function aSeek(a,t){try{a.currentTime=t;}catch(e){}}
+function playS(k){
+ var s=SFX[k];if(!snd||!s)return;
+ var a=s.p[s.i];s.i=(s.i+1)%s.p.length;aSeek(a,0);aPlay(a);
+}
+function stopS(k){var s=SFX[k];if(s)for(var i=0;i<s.p.length;i++)s.p[i].pause();}
+MUS=mkAudio('nauai.mp3',.35);
+MUS.addEventListener('ended',function(){aSeek(MUS,MUS_FROM);if(snd&&S.screen==='play')aPlay(MUS);});   // по кругу — снова с 15-й
+MUS.addEventListener('loadedmetadata',function(){if(MUS.currentTime<MUS_FROM&&MUS.dataset.seek)aSeek(MUS,MUS_FROM);});
+function musicStart(){stopS('win');stopS('fail');MUS.dataset.seek='1';aSeek(MUS,MUS_FROM);if(snd)aPlay(MUS);}
+function musicStop(){MUS.pause();}
+function toggleSnd(){snd=!snd;saveSnd();
+ if(!snd){musicStop();for(var k in SFX)stopS(k);}else if(S.screen==='play')aPlay(MUS);}
+document.addEventListener('visibilitychange',function(){
+ if(document.hidden)musicStop();else if(snd&&S.screen==='play')aPlay(MUS);});
 
 /* === 6. ЧАСТИЦЫ И ВСПЛЫВАЮЩИЙ ТЕКСТ (пулы без аллокаций) === */
 var PN=260,parts=[],pIdx=0;
@@ -225,10 +250,10 @@ function startGame(si){
  S.lane=1;S.laneF=1;S.fb=0;S.shake=0;S.mistakes.length=0;gate.lane=-1;gate.on=false;
  S.combo=0;S.maxCombo=0;S.jump=0;S.land=0;S.flip=false;S.hurt=0;S.hlT=0;S.cur=null;S.cd=2.2;
  S.coins=0;S.coinT=0;S.objD=-6;S.deadT=0;clearObjs();
- shuffle();sfxTick();
+ shuffle();sfxTick();musicStart();
 }
-function toMenu(){S.screen='start';S.scrT=0;clearObjs();}
-function toModes(){S.screen='mode';S.scrT=0;}
+function toMenu(){S.screen='start';S.scrT=0;clearObjs();musicStop();}
+function toModes(){S.screen='mode';S.scrT=0;musicStop();}
 // Проверка выбора в момент пересечения ворот
 function resolveGate(){
  gate.on=false;
@@ -1287,7 +1312,7 @@ window.addEventListener('keydown',function(e){
   else jump();
   e.preventDefault();}
  else if(k==='Escape'){if(S.screen==='over')toModes();else if(S.screen==='mode')toMenu();}
- else if(k==='m'||k==='M'||k==='ь'||k==='Ь'){snd=!snd;saveSnd();}
+ else if(k==='m'||k==='M'||k==='ь'||k==='Ь')toggleSnd();
 });
 var tx=0,ty=0,track=false;
 cv.addEventListener('pointerdown',function(e){tx=e.clientX;ty=e.clientY;track=true;ensureAudio();e.preventDefault();},{passive:false});
@@ -1298,7 +1323,7 @@ cv.addEventListener('pointerup',function(e){
  if(S.help){closeHelp();return;}                  // любой тап закрывает инструкцию
  if(S.screen==='play'&&-dy>lim&&abs(dy)>abs(dx)){jump();return;}   // свайп вверх — прыжок
  if(abs(dx)>lim&&abs(dx)>abs(dy)){if(S.screen==='start')selectChar((S.ch+(dx>0?1:NAMES.length-1))%NAMES.length);else if(S.screen==='play')move(dx>0?1:-1);return;}
- if(inRect(sndBtn,x,y,6)){snd=!snd;saveSnd();return;}   // короткий тап
+ if(inRect(sndBtn,x,y,6)){toggleSnd();return;}   // короткий тап
  if(S.screen==='start'){
   if(inRect(ui.help,x,y,6)){openHelp();return;}
   for(var i=0;i<NAMES.length;i++)if(inRect(ui.cards[i],x,y,4)){selectChar(i);return;}
