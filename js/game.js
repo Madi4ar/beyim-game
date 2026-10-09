@@ -628,7 +628,7 @@ function drawObjs(lo,hi){                     // объекты с lo < z <= hi
 }
 
 /* === 11. ВОРОТА С ТРЕМЯ ВАРИАНТАМИ СЛОВ === */
-var SCOL=[['#ff8a5c','#e0502e'],['#5ec0f5','#2383c9'],['#7ad860','#3f9e33']];
+var SCOL=[['#ff8a5c','#e0502e'],['#5ec0f5','#2383c9'],['#7ad860','#3f9e33']],GREF=64;   // эталонный размер шрифта табличек
 function drawGate(){
  if(!gate.on||gate.z<.3||gate.z>260)return;
  var p=pz(gate.z),gy=yAt(p);if(gy<hzY)return;
@@ -646,7 +646,8 @@ function drawGate(){
  }
  var mr=beam*.9,my=byy-mr*.3;                  // медальон с вопросом
  fl('#1d3557');dot(cx,my,mr);fl('#ffd35a');dot(cx,my,mr*.78);
- if(mr>5){fl('#1d3557');g.font=F(mr*1.2,900);center();g.fillText('?',cx,my+mr*.06);}
+ if(mr>3){g.save();g.globalAlpha*=cl((mr-3)/4);g.translate(cx,my+mr*.06);g.scale(mr*1.2/GREF,mr*1.2/GREF);
+  fl('#1d3557');g.font=F(GREF,900);center();g.fillText('?',0,0);g.restore();}
  var sh=H*.16*p,sw=LW*.88*p,sy=gy-topH+beam;
  if(sh<4||sw<6)return;
  center();
@@ -662,12 +663,14 @@ function drawGate(){
   g.shadowBlur=0;
   sk(sel&&near>0?'#ffe14d':'rgba(255,255,255,.95)',mx(1,sh*(sel&&near>0?.09:.06)));g.stroke();
   fl('rgba(255,255,255,.22)');rr(-sw/2+sh*.12,by+sh*.08,sw-sh*.24,sh*.3,sh*.15);g.fill();
-  var fs=sh*.5;g.font=F(fs,900);                 // текст ужимается по ширине таблички
-  var tw=g.measureText(gate.words[i]).width;
-  if(tw>sw*.86){fs=fs*sw*.86/tw;g.font=F(fs,900);}
-  if(fs>=5){
-   fl('rgba(0,0,0,.25)');g.fillText(gate.words[i],fs*.05,by+sh/2+fs*.1);
-   fl('#fff');g.fillText(gate.words[i],0,by+sh/2+fs*.04);
+  // текст рисуется эталонным шрифтом и плавно масштабируется: целые px у мелкого шрифта давали дрожание
+  g.font=F(GREF,900);var tw=g.measureText(gate.words[i]).width,fs=mn(sh*.5,sw*.86*GREF/tw);
+  if(fs>=2.5){
+   g.save();g.globalAlpha*=cl((fs-2.5)/5);       // вдали текст проявляется, а не выскакивает
+   g.translate(0,by+sh/2);g.scale(fs/GREF,fs/GREF);
+   fl('rgba(0,0,0,.25)');g.fillText(gate.words[i],GREF*.05,GREF*.1);
+   fl('#fff');g.fillText(gate.words[i],0,GREF*.04);
+   g.restore();
   }
   g.restore();
  }
