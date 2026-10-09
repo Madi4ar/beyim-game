@@ -67,7 +67,7 @@ var SL=[];for(i=0;i<26;i++)SL.push({a:rnd()*TAU,o:rnd(),l:.06+rnd()*.12});
 var R0=function(){return{x:0,y:0,w:0,h:0};};
 var ui={btn:R0(),btn2:R0(),cards:[R0(),R0()],modes:[R0(),R0(),R0(),R0()],tabs:[R0(),R0()],lang:[R0(),R0()],back:R0(),help:R0(),helpOk:R0(),maps:[R0(),R0()],hx:[0,0,0],hy:0};
 // Язык интерфейса: LG=0 — қазақша, LG=1 — русский. L(ключ) возвращает строку на текущем языке
-var LG=0,TX={
+var LG=0,TX={   // LG=0 — основной (казахский)
  role:['ою-өрнекті күртеше','куртка с орнаментом'],map0:['Дала','Степь'],map1:['Түнгі Астана','Ночная Астана'],
  wrong:['Қате!','Ошибка!'],oops:['Ой!','Ой!'],go:['Алға!','Вперёд!'],combo:['КОМБО','КОМБО'],
  rec:['Рекорд','Рекорд'],q:['Сұрақ','Вопрос'],
@@ -265,7 +265,7 @@ function loadSave(){
    st.best=parseInt(localStorage.getItem(st.key),10)||0;st.stars=parseInt(localStorage.getItem(st.key+'_s'),10)||0;}
   var s=localStorage.getItem('mm_snd');if(s!==null)snd=(s==='1');
   var mp=parseInt(localStorage.getItem('mm_map'),10);if(mp>=0&&mp<MAPS.length)S.map=mp;
-  if(localStorage.getItem('mm_lang')==='1'){LG=1;S.modeSel=4;document.documentElement.lang='ru';}
+  localStorage.removeItem('mm_lang');            // основной язык — казахский: игра всегда стартует на нём
   var c=localStorage.getItem('mm_hero');c=parseInt(c,10);if(c>=0&&c<NAMES.length)S.ch=c;
   S.coinTotal=parseInt(localStorage.getItem('mm_coins'),10)||0;
   if(!localStorage.getItem('mm_help'))S.help=true;}catch(e){}   // при первом запуске — сразу инструкция
@@ -1318,7 +1318,7 @@ function draw(){
 function modeStep(d){var b=grpBase();S.modeSel=b+(S.modeSel-b+d+4)%4;sfxMove();}
 function switchLang(l){if(LG===l&&grpBase()===l*4)return;   // язык интерфейса и наборы вопросов меняются вместе
  LG=l;S.modeSel=l*4+S.modeSel%4;banner.key='';overC.key='';sfxSelect();
- try{localStorage.setItem('mm_lang',String(l));document.documentElement.lang=l?'ru':'kk';}catch(e){}}
+ try{document.documentElement.lang=l?'ru':'kk';}catch(e){}}
 // Переключатель «ҚАЗ | РУС» на главном экране
 function drawLangToggle(x,y,h){
  var sw=h*1.55,LB=['ҚАЗ','РУС'];
