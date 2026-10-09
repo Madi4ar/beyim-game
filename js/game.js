@@ -25,10 +25,15 @@ var FONT='Nunito,system-ui,"Segoe UI",Arial,sans-serif';
 var S={screen:'start',scrT:0,score:0,dScore:0,best:0,newBest:false,correct:0,lives:3,speed:24,dist:0,dayT:0,
  lane:1,laneF:1,runT:0,shake:0,fb:0,fbOk:false,order:[],oi:0,cur:null,curIdx:-1,mistakes:[],
  ch:0,combo:0,maxCombo:0,comboT:0,cd:0,jump:0,hurt:0,flashT:0,flashC:'255,255,255',hlT:0,dustT:0,
- px:0,py:0,ph:0,land:0,flip:false,starSnd:0,set:0,modeSel:0,asked:0,won:false,earned:0,nextSet:-1};
+ px:0,py:0,ph:0,land:0,flip:false,starSnd:0,set:0,modeSel:0,asked:0,won:false,earned:0,nextSet:-1,
+ coins:0,coinT:0,coinTotal:0,objD:0,deadT:0};
 
 // Единственный объект ворот — переиспользуется для каждого вопроса
 var gate={on:false,z:0,lane:-1,words:['','','']};
+
+// Пул объектов на дороге: kind 0 — монета (тиын), 1 — камень, 2 — бревно
+var ON=40,objs=[],ord=[],OBJ_GAP=17,COIN_GAP=2.4;
+for(var i0=0;i0<ON;i0++)objs.push({on:false,z:0,lane:0,kind:0,done:false,p:0,sc:1});
 
 // Кольцевой буфер придорожных объектов (дерево / юрта / куст / фонарь)
 var DN=18,DSP=14,decs=[],ring=0,i;
@@ -41,8 +46,8 @@ var SL=[];for(i=0;i<26;i++)SL.push({a:rnd()*TAU,o:rnd(),l:.06+rnd()*.12});
 
 // Интерфейсные зоны нажатия (обновляются при отрисовке)
 var R0=function(){return{x:0,y:0,w:0,h:0};};
-var ui={btn:R0(),btn2:R0(),cards:[R0(),R0()],modes:[R0(),R0(),R0(),R0()],back:R0(),hx:[0,0,0],hy:0};
-var NAMES=['Қыз бала','Ұл бала'],ROLES=['ұлттық киім','ұлттық киім'];
+var ui={btn:R0(),btn2:R0(),cards:[R0(),R0(),R0()],modes:[R0(),R0(),R0(),R0()],back:R0(),hx:[0,0,0],hy:0};
+var NAMES=['Қыз бала','Ұл бала','Батыр'],ROLES=['ұлттық киім','ұлттық киім','ою-өрнекті күртеше'];
 
 function pz(z){return 1/(1+z/DEPTH);}            // масштаб по расстоянию
 function yAt(p){return hzY+(baseY-hzY)*p;}       // экранная Y по масштабу
@@ -130,6 +135,8 @@ function sfxTick(){tone(660,660,0,.1,'square',.08);}
 function sfxGo(){tone(880,1320,0,.28,'triangle',.2);}
 function sfxSelect(){tone(520,880,0,.13,'triangle',.16);}
 function sfxStar(n){tone(880+n*220,880+n*220,0,.18,'triangle',.14);}
+function sfxCoin(){tone(988,988,0,.06,'square',.07);tone(1319,1319,.06,.12,'square',.07);}
+function sfxHit(){tone(160,70,0,.25,'square',.16);tone(90,60,0,.3,'sawtooth',.12);}
 
 /* === 6. ЧАСТИЦЫ И ВСПЛЫВАЮЩИЙ ТЕКСТ (пулы без аллокаций) === */
 var PN=260,parts=[],pIdx=0;
@@ -180,10 +187,12 @@ function loadSave(){
  try{for(var i=0;i<SETS.length;i++){var st=SETS[i];
    st.best=parseInt(localStorage.getItem(st.key),10)||0;st.stars=parseInt(localStorage.getItem(st.key+'_s'),10)||0;}
   var s=localStorage.getItem('mm_snd');if(s!==null)snd=(s==='1');
-  var c=localStorage.getItem('mm_hero');c=parseInt(c,10);if(c>=0&&c<NAMES.length)S.ch=c;}catch(e){}
+  var c=localStorage.getItem('mm_hero');c=parseInt(c,10);if(c>=0&&c<NAMES.length)S.ch=c;
+  S.coinTotal=parseInt(localStorage.getItem('mm_coins'),10)||0;}catch(e){}
 }
 function saveBest(){var st=SETS[S.set];
  try{localStorage.setItem(st.key,String(st.best));localStorage.setItem(st.key+'_s',String(st.stars));}catch(e){}}
+function saveCoins(){try{localStorage.setItem('mm_coins',String(S.coinTotal));}catch(e){}}
 function saveSnd(){try{localStorage.setItem('mm_snd',snd?'1':'0');}catch(e){}}
 function saveChar(){try{localStorage.setItem('mm_hero',String(S.ch));}catch(e){}}
 
@@ -205,6 +214,7 @@ function nextQuestion(){
   else{gate.words[i]=S.cur.wrong[flip?1-wi:wi];wi++;}
  }
  gate.z=mx(SPAWN_Z,S.speed*3);gate.on=true;banner.key='';banner.t0=T;
+ for(var k=0;k<ON;k++)if(objs[k].on&&abs(objs[k].z-gate.z)<12)objs[k].on=false;   // перед воротами — свободно
 }
 function startGame(si){
  if(si>=0&&si<SETS.length)S.set=si;
@@ -213,9 +223,10 @@ function startGame(si){
  S.screen='play';S.scrT=0;S.score=0;S.dScore=0;S.correct=0;S.lives=3;S.speed=st.spd;
  S.lane=1;S.laneF=1;S.fb=0;S.shake=0;S.mistakes.length=0;gate.lane=-1;gate.on=false;
  S.combo=0;S.maxCombo=0;S.jump=0;S.land=0;S.flip=false;S.hurt=0;S.hlT=0;S.cur=null;S.cd=2.2;
+ S.coins=0;S.coinT=0;S.objD=-6;S.deadT=0;clearObjs();
  shuffle();sfxTick();
 }
-function toMenu(){S.screen='start';S.scrT=0;}
+function toMenu(){S.screen='start';S.scrT=0;clearObjs();}
 function toModes(){S.screen='mode';S.scrT=0;}
 // Проверка выбора в момент пересечения ворот
 function resolveGate(){
@@ -248,6 +259,7 @@ function gameOver(won){
  // звёзды: в уровне — за число оставшихся жизней, в бесконечном — за верные ответы
  S.earned=st.endless?(S.correct>=15?3:S.correct>=8?2:S.correct>=3?1:0):(won?S.lives:0);
  S.nextSet=(won&&!st.endless&&S.set+1<SETS.length)?S.set+1:-1;
+ S.coinTotal+=S.coins;saveCoins();
  S.newBest=S.score>st.best;
  if(S.newBest){st.best=S.best=S.score;}
  if(S.earned>st.stars)st.stars=S.earned;
@@ -259,6 +271,56 @@ function gameOver(won){
 function move(d){
  if(S.screen!=='play')return;
  var n=S.lane+d;if(n>=0&&n<=2){S.lane=n;sfxMove();}
+}
+function jump(){
+ if(S.screen!=='play'||S.cd>0||S.jump>0||S.deadT>0)return;
+ S.jump=JUMP;S.flip=false;sfxJump();
+}
+
+/* --- Монеты и препятствия --- */
+function clearObjs(){for(var k=0;k<ON;k++)objs[k].on=false;}
+function addObj(z,lane,kind){
+ for(var k=0;k<ON;k++){var o=objs[k];if(o.on)continue;
+  o.on=true;o.z=z;o.lane=lane;o.kind=kind;o.done=false;o.p=rnd()*TAU;o.sc=.85+rnd()*.3;return;}
+}
+function nearGate(z0,z1){return gate.on&&gate.z>z0-12&&gate.z<z1+12;}
+// Ряд объектов: цепочка монет или препятствие (хотя бы одна дорожка всегда свободна)
+function spawnRow(){
+ var z=SPAWN_Z,lane=(rnd()*3)|0,n,k;
+ if(rnd()<.45){
+  n=3+((rnd()*3)|0);if(nearGate(z,z+n*COIN_GAP))return;
+  for(k=0;k<n;k++)addObj(z+k*COIN_GAP,lane,0);
+  return;
+ }
+ if(nearGate(z-COIN_GAP,z+COIN_GAP))return;
+ addObj(z,lane,rnd()<.55?1:2);
+ var free=(lane+1+((rnd()*2)|0))%3;
+ if(S.speed>26&&rnd()<.4)addObj(z,3-lane-free,rnd()<.5?1:2);   // два препятствия на скорости
+ if(rnd()<.6)for(k=-1;k<=1;k++)addObj(z+k*COIN_GAP,free,0);
+}
+function takeCoin(){
+ S.coins++;S.coinT=.3;sfxCoin();
+ burst(S.px,S.py-S.ph*.35,7,['#ffd84d','#fff6a8','#ffffff'],U*.3,1,U*.009,U*.4);
+}
+function hitObstacle(){
+ if(S.lives<=0)return;
+ S.combo=0;S.lives--;S.shake=.45;S.hurt=1.3;S.hlT=.7;S.flashT=1;S.flashC='255,60,60';
+ burst(S.px,S.py-S.ph*.2,22,['#9aa4b5','#6b7385','#c9a27a'],U*.5,0,U*.016,U*.9);
+ burst(ui.hx[S.lives],ui.hy,14,['#e23b4e','#ff8a9a'],U*.35,0,U*.01,U*1.2);
+ floatText('Ой!',S.px,S.py-S.ph*.95,'#ff6b6b',mn(U*.08,42));
+ sfxHit();
+ if(S.lives<=0){S.deadT=.8;gate.on=false;}
+}
+function updObjs(step,live){
+ for(var k=0;k<ON;k++){var o=objs[k];if(!o.on)continue;
+  o.z-=step;
+  if(live&&!o.done&&o.z<=PLR_Z+.5){o.done=true;
+   if(abs(S.laneF-o.lane)<.55){
+    if(o.kind===0){o.on=false;takeCoin();continue;}
+    if(S.jump<=0&&S.hurt<=0&&S.deadT<=0)hitObstacle();   // в прыжке — перелетаем
+   }}
+  if(o.z<-2)o.on=false;
+ }
 }
 function selectChar(c){
  if(S.ch===c)return;
@@ -285,10 +347,11 @@ function update(dt){
  if(S.flashT>0)S.flashT-=dt*1.8;
  if(S.hlT>0)S.hlT-=dt;
  if(S.comboT>0)S.comboT-=dt;
+ if(S.coinT>0)S.coinT-=dt;
  S.dScore+=(S.score-S.dScore)*mn(1,dt*8);
  updParts(dt);updFloats(dt);
- if(S.screen!=='play'){S.dist+=10*dt;S.runT+=dt*7;updateDecs(10*dt);return;}
- S.dist+=S.speed*dt;S.runT+=dt*(7+S.speed*.22);updateDecs(S.speed*dt);
+ if(S.screen!=='play'){S.dist+=10*dt;S.runT+=dt*7;updateDecs(10*dt);updObjs(10*dt,false);return;}
+ S.dist+=S.speed*dt;S.runT+=dt*(7+S.speed*.22);updateDecs(S.speed*dt);updObjs(S.speed*dt,S.cd<=0);
  S.dustT-=dt;                                 // пыль из-под ног
  if(S.dustT<=0&&S.jump<=0){S.dustT=.07;
   spawn(S.px+(rnd()-.5)*S.ph*.15,S.py,(rnd()-.5)*U*.15,U*(.1+rnd()*.1),.5,S.ph*.025,'rgba(240,228,200,.6)',0,0,S.ph*.06);}
@@ -298,7 +361,9 @@ function update(dt){
   if(S.cd<=0)nextQuestion();
   return;
  }
+ if(S.deadT>0){S.deadT-=dt;if(S.deadT<=0)gameOver(false);return;}   // разбился о препятствие
  S.speed=mn(SPDMAX,S.speed+SPDUP*dt);    // плавный разгон со временем
+ S.objD+=S.speed*dt;if(S.objD>=OBJ_GAP){S.objD=-rnd()*6;spawnRow();}
  if(gate.on){gate.z-=S.speed*dt;if(gate.z<=PLR_Z)resolveGate();}
  else if(S.fb>0){S.fb-=dt;if(S.fb<=0){var st=SETS[S.set];
   if(S.lives<=0)gameOver(false);
@@ -441,6 +506,52 @@ function drawDecs(){
   else if(d.kind===1)drawYurt(x,y,s);
   else if(d.kind===2)drawBush(x,y,s);
   else drawLamp(x,y,s,d.side);
+ }
+}
+
+/* === 10б. МОНЕТЫ И ПРЕПЯТСТВИЯ === */
+function coinIcon(x,y,r){fl('#c98a00');dot(x,y,r);fl('#ffd84d');dot(x,y,r*.76);fl('#fff6a8');dot(x-r*.28,y-r*.28,r*.2);}
+function drawCoin(x,y,s,ph){                  // вращающийся тиын над дорогой
+ var r=s*.13,cy=y-r*2+sin(T*4+ph)*r*.3,sc=mx(.15,abs(cos(T*4.5+ph)));
+ fl('rgba(0,0,0,.16)');g.beginPath();g.ellipse(x,y,r*.75,r*.2,0,0,TAU);g.fill();
+ fl('#c98a00');g.beginPath();g.ellipse(x,cy,r*sc,r,0,0,TAU);g.fill();
+ fl('#ffd84d');g.beginPath();g.ellipse(x,cy,r*.76*sc,r*.76,0,0,TAU);g.fill();
+ if(r>4){fl('#e7a91c');g.beginPath();g.ellipse(x,cy,r*.3*sc,r*.3,0,0,TAU);g.fill();}
+ fl('#fff6a8');g.beginPath();g.ellipse(x-r*.3*sc,cy-r*.32,r*.16*sc,r*.2,0,0,TAU);g.fill();
+}
+function drawRock(x,y,s){                     // серый валун с гранями
+ var w=s*.6,h=s*.4;
+ fl('rgba(0,0,0,.2)');g.beginPath();g.ellipse(x,y,w*.58,w*.1,0,0,TAU);g.fill();
+ fl('#878c99');g.beginPath();g.moveTo(x-w*.5,y);g.lineTo(x-w*.46,y-h*.45);g.lineTo(x-w*.28,y-h*.9);
+ g.lineTo(x-w*.02,y-h);g.lineTo(x+w*.26,y-h*.84);g.lineTo(x+w*.47,y-h*.42);g.lineTo(x+w*.5,y);g.closePath();g.fill();
+ fl('#a9aebb');g.beginPath();g.moveTo(x-w*.46,y-h*.45);g.lineTo(x-w*.28,y-h*.9);g.lineTo(x-w*.02,y-h);
+ g.lineTo(x+w*.06,y-h*.55);g.lineTo(x-w*.2,y-h*.32);g.closePath();g.fill();
+ fl('#686d79');g.beginPath();g.moveTo(x-w*.5,y);g.lineTo(x-w*.48,y-h*.2);g.lineTo(x+w*.49,y-h*.24);g.lineTo(x+w*.5,y);g.closePath();g.fill();
+ if(w>14){sk('#5d626d',mx(1,w*.018));g.lineCap='round';g.beginPath();
+  g.moveTo(x+w*.12,y-h*.78);g.lineTo(x+w*.2,y-h*.55);g.lineTo(x+w*.15,y-h*.38);g.stroke();
+  fl('#7fae5a');dot(x-w*.36,y-h*.22,w*.05);dot(x-w*.3,y-h*.18,w*.04);}  // мох
+}
+function drawLog(x,y,s){                      // бревно поперёк дорожки
+ var w=s*.78,h=s*.2;
+ fl('rgba(0,0,0,.2)');g.beginPath();g.ellipse(x,y,w*.55,w*.07,0,0,TAU);g.fill();
+ fl('#8a5a34');rr(x-w/2,y-h,w,h,h/2);g.fill();
+ fl('#a8744a');rr(x-w/2+h*.3,y-h*.9,w-h*.6,h*.28,h*.14);g.fill();
+ if(w>16){sk('#6e4426',mx(1,h*.07));g.beginPath();
+  g.moveTo(x-w*.2,y-h*.55);g.lineTo(x-w*.05,y-h*.55);g.moveTo(x+w*.08,y-h*.35);g.lineTo(x+w*.25,y-h*.35);g.stroke();}
+ fl('#e3bf8f');g.beginPath();g.ellipse(x+w/2-h*.3,y-h/2,h*.3,h*.5,0,0,TAU);g.fill();
+ if(w>16){sk('#b98a58',mx(1,h*.06));g.beginPath();g.ellipse(x+w/2-h*.3,y-h/2,h*.15,h*.26,0,0,TAU);g.stroke();}
+}
+function sortObjs(){                          // дальние рисуются первыми
+ ord.length=0;
+ for(var k=0;k<ON;k++)if(objs[k].on){var j=ord.length;ord.push(k);
+  while(j>0&&objs[ord[j-1]].z<objs[k].z){ord[j]=ord[j-1];j--;}ord[j]=k;}
+}
+function drawObjs(lo,hi){                     // объекты с lo < z <= hi
+ for(var k=0;k<ord.length;k++){var o=objs[ord[k]];
+  if(!o.on||o.z<=lo||o.z>hi)continue;
+  var p=pz(o.z),y=yAt(p);if(y<hzY)continue;
+  var x=cx+(o.lane-1)*LW*p,s=LW*p;if(s<3)continue;
+  if(o.kind===0)drawCoin(x,y,s,o.p);else if(o.kind===1)drawRock(x,y,s*o.sc);else drawLog(x,y,s);
  }
 }
 
@@ -660,6 +771,27 @@ function drawUlBack(ph,mode){
  fl('#4a2c1c');dot(0,-.85,.122);                       // затылок
  taqiya();
 }
+/* --- Батыр: персонаж из спрайт-листа img/batyr.png ---
+   Кадры [x,y,w,h] в атласе; рост стоящего героя ≈ 1.2 условной единицы, точка привязки — низ кадра по центру */
+var BATYR=new Image(),BF_={front:[2,2,108,268],side1:[112,2,91,266],side2:[205,2,85,263],back:[292,2,107,263],
+ run1:[401,2,134,202],run2:[537,2,119,191],run3:[658,2,155,194],jump:[815,2,145,162],win:[962,2,110,234],fall:[1074,2,156,156]};
+var RUNSEQ=['run1','run2','run3','run2'],batyrFace=1;
+BATYR.src='img/batyr.png';
+function drawBatyr(ph,mode){
+ var n,dx=0,dy=0,sx=1,sy=1;
+ if(mode===1){n='back';var st=sin(ph);                  // в забеге — вид со спины, смотрит вперёд по дороге
+  dx=st*.025;sy=1-abs(st)*.035+abs(cos(ph))*.02;sx=2-sy;}   // шаги: покачивание и пружинка
+ else if(mode===2){n='back';sy=1.06;sx=.95;}             // прыжок — тот же кадр, вытянут вверх
+ else if(mode===4)n='fall';
+ else if(mode===3){var c=T%4;n=c<2.4?'win':RUNSEQ[Math.floor(T*9)%4];   // на карточке: радуется, потом бежит на месте
+  if(n==='win')dy=-abs(sin(T*5))*.06;}
+ else{n='front';sy=1+sin(T*2.2)*.012;sx=2-sy;}       // дыхание
+ if(!BATYR.complete||!BATYR.naturalWidth){fl('#1f8f8f');rr(-.15,-1.1,.3,1.1,.1);g.fill();return;}
+ var f=BF_[n],k=1.2/268,w=f[2]*k,hh=f[3]*k;
+ g.save();g.translate(dx,dy);g.scale(sx*(mode===4?batyrFace:1),sy);   // вид со спины не зеркалим — сумка на месте
+ g.drawImage(BATYR,f[0],f[1],f[2],f[3],-w/2,-hh,w,hh);
+ g.restore();
+}
 var spinA=0,sq=0;                              // кувырок и сжатие при приземлении
 function drawRunner(kind,x,y,h,ph,mode,lean,jy){
  h*=.9;
@@ -672,7 +804,8 @@ function drawRunner(kind,x,y,h,ph,mode,lean,jy){
  g.translate(0,-jy/h-bob);g.rotate(lean+(mode===1?sin(ph)*.035:0));
  if(spinA){g.translate(0,-.55);g.rotate(spinA);g.translate(0,.55);}
  g.lineCap='round';g.lineJoin='round';
- if(mode===1||mode===2){if(kind===0)drawKyzBack(ph,mode);else drawUlBack(ph,mode);}   // в забеге — вид со спины
+ if(kind===2)drawBatyr(ph,mode);
+ else if(mode===1||mode===2){if(kind===0)drawKyzBack(ph,mode);else drawUlBack(ph,mode);}   // в забеге — вид со спины
  else if(kind===0)drawKyz(s1,mode,ph);else drawUl(s1,mode);
  g.restore();
 }
@@ -685,7 +818,9 @@ function drawPlayer(){
   if(S.flip){var f=cl((q-.1)/.75);spinA=-TAU*f*f*(3-2*f);}}
  if(S.land>0)sq=.14*S.land/.16;
  if(S.hurt>0&&sin(T*38)>0)g.globalAlpha=.4;       // мигание после ошибки
- drawRunner(S.ch,x,y,h,S.runT,jy>0?2:1,(S.lane-S.laneF)*.35,jy);
+ var lean=(S.lane-S.laneF)*.35;
+ if(lean>.03)batyrFace=1;else if(lean<-.03)batyrFace=-1;   // спрайт смотрит в сторону перестроения
+ drawRunner(S.ch,x,y,h,S.runT,jy>0?2:(S.ch===2&&(S.deadT>0||S.hurt>.85)?4:1),lean,jy);
  g.globalAlpha=1;
 }
 
@@ -769,6 +904,12 @@ function drawHUD(){
   heart(hx,hy,hs*sc,on);
   if(!on&&i===S.lives&&S.hlT>0){var q=S.hlT/.7;g.globalAlpha=q;heart(hx,hy,hs*(1+(1-q)*1.6),true);g.globalAlpha=1;}
  }
+ // монеты
+ var cy2=rowY+ph+fs*.3,cph=ph*.8,ctx2=String(S.coins),cb=1+cl(S.coinT/.3)*.35;
+ g.font=F(fs*.95,900);var cpw=g.measureText(ctx2).width+fs*2.2;
+ pill(m,cy2,cpw,cph);
+ coinIcon(m+fs*.9,cy2+cph/2,fs*.48*cb);
+ g.textAlign='left';g.textBaseline='middle';fl('#ffe14d');g.fillText(ctx2,m+fs*1.6,cy2+cph/2+1);
  // счёт
  var st=String(Math.round(S.dScore));g.font=F(fs*1.1,900);
  var tw=g.measureText(st).width,pw=tw+fs*2.6,px=W-m-pw;
@@ -780,7 +921,7 @@ function drawHUD(){
  g.strokeText('Рекорд: '+S.best,W-m-fs*.3,rowY+ph+fs*.6);g.fillText('Рекорд: '+S.best,W-m-fs*.3,rowY+ph+fs*.6);
  if(!SETS[S.set].endless){                         // прогресс уровня
   var pt='Сұрақ: '+S.asked+'/'+SETS[S.set].items.length;g.textAlign='left';
-  g.strokeText(pt,m+fs*.3,rowY+ph+fs*.6);g.fillText(pt,m+fs*.3,rowY+ph+fs*.6);
+  g.strokeText(pt,m+fs*.3,cy2+cph+fs*.6);g.fillText(pt,m+fs*.3,cy2+cph+fs*.6);
  }
  // комбо
  if(S.combo>=2){
@@ -897,13 +1038,13 @@ function drawStart(){
  titleText('Зерде',y,ts,'#ffffff','#bfe4ff',0);y+=ts*1.08;
  titleText('Run',y,ts,'#ffe066','#ff7a3d',1);y+=ts*.95;
  center();fl('rgba(255,255,255,.92)');g.font=F(ts*.34,800);
- g.font=F(fit('Дұрыс сөз жазылған қақпадан өт!',ts*.34,800,W*.92),800);
- g.fillText('Дұрыс сөз жазылған қақпадан өт!',W/2,y);y+=ts*.72;
+ g.font=F(fit('Дұрыс сөзден өт, тиын жина, тастан секір!',ts*.34,800,W*.92),800);
+ g.fillText('Дұрыс сөзден өт, тиын жина, тастан секір!',W/2,y);y+=ts*.72;
  fl('#ffd84d');g.font=F(ts*.3,900);g.fillText('Кейіпкерді таңда',W/2,y);y+=ts*.45;
- // карточки: в альбоме в один ряд, в портрете сеткой 2×2
- var NC=NAMES.length,cols=W>H*1.1?NC:2,rows=Math.ceil(NC/cols),gap=mn(W*.03,18),k;
+ // карточки: до трёх героев — в один ряд, больше — в портрете сеткой по 2
+ var NC=NAMES.length,cols=W>H*1.1||NC<=3?NC:2,rows=Math.ceil(NC/cols),gap=mn(W*.03,18),k;
  var bh=mn(H*.085,64,U*.15),bw=mn(W*.62,300);
- var fs=fit('Телефон: свайп не экранның жартысын бас',mn(W*.034,H*.024,16),700,W*.9);
+ var fs=fit('Телефон: свайп ← → немесе экранды бас, ↑ — секіру',mn(W*.034,H*.024,16),700,W*.9);
  var avail=H-y-(bh*1.6+fs*5.6+mx(16,H*.035));
  var cw=mn((W-gap*(cols+1))/cols,210),chh=mn(cw*1.3,(avail-gap*(rows-1))/rows);
  cw=mn(cw,chh/1.05);
@@ -916,8 +1057,8 @@ function drawStart(){
  drawBtn(ui.btn,'Бастау','#ffd166','#ff9f1c','#c96a0a',true);
  y+=bh*1.6;
  center();fl('rgba(255,255,255,.8)');g.font=F(fs,700);
- g.fillText('Компьютер: ← →  немесе  A / D',W/2,y);y+=fs*1.5;
- g.fillText('Телефон: свайп не экранның жартысын бас',W/2,y);y+=fs*1.9;
+ g.fillText('Компьютер: ← → / A D,  секіру: ↑ / Пробел',W/2,y);y+=fs*1.5;
+ g.fillText('Телефон: свайп ← → немесе экранды бас, ↑ — секіру',W/2,y);y+=fs*1.9;
  g.globalAlpha=1;
 }
 // Экран выбора категории и уровня
@@ -992,7 +1133,10 @@ function drawOver(){
  }else{fl('#5a6b80');g.font=F(mn(w*.042,h*.03),800);g.fillText('Рекорд: '+S.best,W/2,y);}
  y+=h*.065;
  fl('#2e9d4a');g.font=F(mn(w*.04,h*.03),800);
- g.fillText('Дұрыс: '+S.correct+(st.endless?'':'/'+st.items.length)+'   •   Ең ұзақ комбо: '+S.maxCombo,W/2,y);y+=h*.06;
+ g.fillText('Дұрыс: '+S.correct+(st.endless?'':'/'+st.items.length)+'   •   Ең ұзақ комбо: '+S.maxCombo,W/2,y);y+=h*.05;
+ var ct='Тиын: '+S.coins+'   •   Барлығы: '+S.coinTotal,cfs=mn(w*.04,h*.03);g.font=F(cfs,800);
+ var ctw=g.measureText(ct).width;coinIcon(W/2-ctw/2-cfs*.8,y,cfs*.55);
+ fl('#c98a00');g.fillText(ct,W/2+cfs*.1,y);y+=h*.06;
  var bh2=mn(h*.1,58),btnY=top+h-bh2-h*.06,fsI=mn(w*.034,h*.027);
  var key=S.set+':'+S.mistakes.join(',')+'|'+W+'|'+H;
  if(overC.key!==key){                       // список ошибок готовится один раз
@@ -1031,8 +1175,11 @@ function draw(){
  mountains(PK1,.08,mn(U*.38,hzY*.7),P.mF,true);
  mountains(PK2,.16,mn(U*.26,hzY*.5),P.mN,false);
  hills(.35,.5,P.hF);hills(.6,.34,P.hN);haze();
- drawRoad();drawDecs();drawGate();
+ drawRoad();drawDecs();
+ sortObjs();var gz=gate.on?gate.z:PLR_Z;
+ drawObjs(gz,1e9);drawGate();drawObjs(PLR_Z,gz);
  if(S.screen==='play')drawPlayer();
+ drawObjs(-1e9,PLR_Z);
  g.restore();
  drawSpeed();
  fl(vign);fr(0,0,W,H);
@@ -1050,13 +1197,14 @@ window.addEventListener('keydown',function(e){
  var k=e.key;ensureAudio();
  if(k==='ArrowLeft'||k==='a'||k==='A'||k==='ф'||k==='Ф'){if(S.screen==='start')selectChar((S.ch+NAMES.length-1)%NAMES.length);else if(S.screen==='mode')modeStep(-1);else move(-1);e.preventDefault();}
  else if(k==='ArrowRight'||k==='d'||k==='D'||k==='в'||k==='В'){if(S.screen==='start')selectChar((S.ch+1)%NAMES.length);else if(S.screen==='mode')modeStep(1);else move(1);e.preventDefault();}
- else if(k==='ArrowUp'||k==='w'||k==='W'||k==='ц'||k==='Ц'){if(S.screen==='mode')modeStep(-1);e.preventDefault();}
+ else if(k==='ArrowUp'||k==='w'||k==='W'||k==='ц'||k==='Ц'){if(S.screen==='mode')modeStep(-1);else jump();e.preventDefault();}
  else if(k==='ArrowDown'||k==='s'||k==='S'||k==='ы'||k==='Ы'){if(S.screen==='mode')modeStep(1);e.preventDefault();}
  else if(k>='1'&&k<='4'){if(S.screen==='mode')startGame(+k-1);}
  else if(k===' '||k==='Enter'){
   if(S.screen==='start')toModes();
   else if(S.screen==='mode')startGame(S.modeSel);
   else if(S.screen==='over'&&S.scrT>.5)startGame(S.nextSet>=0?S.nextSet:S.set);
+  else jump();
   e.preventDefault();}
  else if(k==='Escape'){if(S.screen==='over')toModes();else if(S.screen==='mode')toMenu();}
  else if(k==='m'||k==='M'||k==='ь'||k==='Ь'){snd=!snd;saveSnd();}
@@ -1067,6 +1215,7 @@ cv.addEventListener('pointerup',function(e){
  if(!track)return;
  track=false;
  var x=e.clientX,y=e.clientY,dx=x-tx,dy=y-ty,lim=mx(24,U*.06);
+ if(S.screen==='play'&&-dy>lim&&abs(dy)>abs(dx)){jump();return;}   // свайп вверх — прыжок
  if(abs(dx)>lim&&abs(dx)>abs(dy)){if(S.screen==='start')selectChar((S.ch+(dx>0?1:NAMES.length-1))%NAMES.length);else if(S.screen==='play')move(dx>0?1:-1);return;}
  if(inRect(sndBtn,x,y,6)){snd=!snd;saveSnd();return;}   // короткий тап
  if(S.screen==='start'){
