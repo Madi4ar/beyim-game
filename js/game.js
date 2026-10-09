@@ -26,7 +26,7 @@ var S={screen:'start',scrT:0,score:0,dScore:0,best:0,newBest:false,correct:0,liv
  lane:1,laneF:1,runT:0,shake:0,fb:0,fbOk:false,order:[],oi:0,cur:null,curIdx:-1,mistakes:[],
  ch:0,combo:0,maxCombo:0,comboT:0,cd:0,jump:0,hurt:0,flashT:0,flashC:'255,255,255',hlT:0,dustT:0,
  px:0,py:0,ph:0,land:0,flip:false,starSnd:0,set:0,modeSel:0,asked:0,won:false,earned:0,nextSet:-1,
- coins:0,coinT:0,coinTotal:0,objD:0,deadT:0,help:false,helpT:0};
+ coins:0,coinT:0,coinTotal:0,objD:0,deadT:0,help:false,helpT:0,map:0};
 
 // Единственный объект ворот — переиспользуется для каждого вопроса
 var gate={on:false,z:0,lane:-1,words:['','','']};
@@ -46,8 +46,9 @@ var SL=[];for(i=0;i<26;i++)SL.push({a:rnd()*TAU,o:rnd(),l:.06+rnd()*.12});
 
 // Интерфейсные зоны нажатия (обновляются при отрисовке)
 var R0=function(){return{x:0,y:0,w:0,h:0};};
-var ui={btn:R0(),btn2:R0(),cards:[R0(),R0(),R0(),R0()],modes:[R0(),R0(),R0(),R0()],back:R0(),help:R0(),helpOk:R0(),hx:[0,0,0],hy:0};
-var NAMES=['Қыз бала','Ұл бала','Батыр','Жүйрік қыз'],ROLES=['ұлттық киім','ұлттық киім','ою-өрнекті күртеше','ою-өрнекті күртеше'];
+var ui={btn:R0(),btn2:R0(),cards:[R0(),R0()],modes:[R0(),R0(),R0(),R0()],back:R0(),help:R0(),helpOk:R0(),maps:[R0(),R0()],hx:[0,0,0],hy:0};
+var MAPS=['Дала','Түнгі Астана'];
+var NAMES=['Батыр','Жүйрік қыз'],ROLES=['ою-өрнекті күртеше','ою-өрнекті күртеше'];
 
 function pz(z){return 1/(1+z/DEPTH);}            // масштаб по расстоянию
 function yAt(p){return hzY+(baseY-hzY)*p;}       // экранная Y по масштабу
@@ -81,7 +82,16 @@ var PKEYS=[],PALC=[],P={},PA={},PW=[1,0,0,0],k0;
 for(k0 in PAL[0])PKEYS.push(k0);
 for(i=0;i<PAL.length;i++){var o={};for(var j=0;j<PKEYS.length;j++){var h=PAL[i][PKEYS[j]];
  o[PKEYS[j]]=[parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)];}PALC.push(o);}
+// Карта «Түнгі Астана»: всегда ночь, цвета взяты с картинки img/astana.jpg
+var ASTP={sT:'#071443',sM:'#1f2a78',sB:'#5660b2',sun:'#e8eeff',cl:'#3a4a80',sn:'#c5cdee',mF:'#27325f',mN:'#1d2850',
+ hF:'#1f4250',hN:'#183642',gA:'#21483a',gB:'#1d4134',rA:'#4e557c',rB:'#484e73',ed:'#b1beed',tD:'#14352a',tL:'#22503b'};
+var ASTC={};for(k0 in ASTP){var hx0=ASTP[k0];ASTC[k0]=[parseInt(hx0.substr(1,2),16),parseInt(hx0.substr(3,2),16),parseInt(hx0.substr(5,2),16)];}
+var AST=new Image();AST.src='img/astana.jpg';
 function updPal(){
+ if(S.map===1){PW[0]=PW[1]=PW[3]=0;PW[2]=1;      // фонари и звёзды — как ночью
+  for(var n0=0;n0<PKEYS.length;n0++){var nm=PKEYS[n0],C=ASTC[nm],q0=PA[nm]||(PA[nm]=[0,0,0]);
+   q0[0]=C[0];q0[1]=C[1];q0[2]=C[2];P[nm]='rgb('+C[0]+','+C[1]+','+C[2]+')';}
+  return;}
  var c=(S.dayT/DAYLEN)%PAL.length,a=Math.floor(c),f=c-a,b=(a+1)%PAL.length;
  f=f<.7?0:(f-.7)/.3;f=f*f*(3-2*f);              // 70% времени палитра держится
  PW[0]=PW[1]=PW[2]=PW[3]=0;PW[a]=1-f;PW[b]+=f;
@@ -128,8 +138,8 @@ function sfxCombo(){tone(660,660,0,.09,'triangle',.2);tone(880,880,.08,.09,'tria
 function sfxBad(){tone(200,90,0,.3,'sawtooth',.18);}
 function sfxOver(){musicStop();playS('fail');}
 function sfxWin(){musicStop();playS('win');           // победная мелодия вместо фона, затем радость героя
- var c=S.ch===2?'bcheer':S.ch===3?'zcheer':'';if(c)setTimeout(function(){if(S.screen==='over')playS(c);},450);}
-function sfxJump(){if(S.ch===2)playS('bjump');else if(S.ch===3)playS('zjump');else tone(380,820,0,.18,'sine',.12);}
+ var c=S.ch===0?'bcheer':'zcheer';setTimeout(function(){if(S.screen==='over')playS(c);},450);}
+function sfxJump(){playS(S.ch===0?'bjump':'zjump');}
 function sfxMove(){tone(420,640,0,.07,'sine',.08);}
 function sfxTick(){tone(660,660,0,.1,'square',.08);}
 function sfxGo(){tone(880,1320,0,.28,'triangle',.2);}
@@ -212,6 +222,7 @@ function loadSave(){
  try{for(var i=0;i<SETS.length;i++){var st=SETS[i];
    st.best=parseInt(localStorage.getItem(st.key),10)||0;st.stars=parseInt(localStorage.getItem(st.key+'_s'),10)||0;}
   var s=localStorage.getItem('mm_snd');if(s!==null)snd=(s==='1');
+  var mp=parseInt(localStorage.getItem('mm_map'),10);if(mp>=0&&mp<MAPS.length)S.map=mp;
   var c=localStorage.getItem('mm_hero');c=parseInt(c,10);if(c>=0&&c<NAMES.length)S.ch=c;
   S.coinTotal=parseInt(localStorage.getItem('mm_coins'),10)||0;
   if(!localStorage.getItem('mm_help'))S.help=true;}catch(e){}   // при первом запуске — сразу инструкция
@@ -221,6 +232,7 @@ function saveBest(){var st=SETS[S.set];
 function saveCoins(){try{localStorage.setItem('mm_coins',String(S.coinTotal));}catch(e){}}
 function saveSnd(){try{localStorage.setItem('mm_snd',snd?'1':'0');}catch(e){}}
 function saveChar(){try{localStorage.setItem('mm_hero',String(S.ch));}catch(e){}}
+function selectMap(m){if(S.map===m)return;S.map=m;sfxSelect();try{localStorage.setItem('mm_map',String(m));}catch(e){}}
 
 // Перемешивание (Фишер—Йетс): повторов нет, пока список не кончится
 function shuffle(){
@@ -439,6 +451,14 @@ function drawSky(){
  }
  g.globalAlpha=1;
 }
+function drawAstanaBg(){                      // ночная Астана: небо и силуэт города над горизонтом
+ if(!AST.complete||!AST.naturalWidth){drawSky();return;}
+ var iw=AST.naturalWidth,ih=AST.naturalHeight,sc=mx(W/iw,(hzY+2)/ih),dw=iw*sc,dh=ih*sc;
+ g.drawImage(AST,(W-dw)/2,hzY+2-dh,dw,dh);
+ var hg=g.createLinearGradient(0,hzY-U*.05,0,hzY+2);   // мягкий переход к дороге
+ hg.addColorStop(0,'rgba(20,28,70,0)');hg.addColorStop(1,'rgba(20,28,70,.45)');
+ fl(hg);fr(0,hzY-U*.05,W,U*.05+2);
+}
 function mountains(arr,par,hgt,col,snow){       // горный хребет с параллаксом
  var n=arr.length,tw=W*.26,o=(S.dist*par)%(tw*n),s0=Math.floor(o/tw),xo=o-s0*tw;
  var base=hzY+2,cnt=Math.ceil(W/tw)+2,k,x,a;
@@ -482,6 +502,7 @@ function drawRoad(){
   if(yN<hzY)continue;
   fl((k&1)?P.gA:P.gB);               // полосы степи дают ощущение скорости
   fr(0,yF,W,yN-yF+1);
+  if(S.map===1){fl((k&1)?'#6c698f':'#645f86');quad(-rHalf*1.34,rHalf*1.34,pN,pF,yN,yF);}   // тротуар Астаны
   fl((k&1)?P.rA:P.rB);               // полотно дороги
   quad(-rHalf,rHalf,pN,pF,yN,yF);
   fl(P.ed);                          // боковые линии
@@ -523,11 +544,28 @@ function drawLamp(x,y,s,side){
   fl(lg);fr(hx-s*.35,hy-s*.33,s*.7,s*.7);}
  fl(night>.3?'#fff2b8':'#f2f2f2');dot(hx,hy+s*.025,s*.035);
 }
+function drawCypress(x,y,s){                  // стриженое дерево аллеи
+ fl('#3a2a20');fr(x-s*.025,y-s*.12,s*.05,s*.12);
+ fl(P.tD);g.beginPath();g.ellipse(x,y-s*.45,s*.14,s*.36,0,0,TAU);g.fill();
+ fl(P.tL);g.beginPath();g.ellipse(x-s*.04,y-s*.52,s*.06,s*.24,0,0,TAU);g.fill();
+}
+function drawBollard(x,y,s){                  // светящийся столбик вдоль тротуара
+ var w=s*.07,h=s*.24,ly=y-h*.78;
+ var lg=g.createRadialGradient(x,ly,0,x,ly,s*.3);
+ lg.addColorStop(0,'rgba(255,214,120,.55)');lg.addColorStop(1,'rgba(255,214,120,0)');
+ fl(lg);fr(x-s*.3,ly-s*.3,s*.6,s*.6);
+ fl('#2b2e3d');fr(x-w/2,y-h,w,h);
+ fl('#ffe7a3');fr(x-w*.38,y-h*.92,w*.76,h*.34);
+}
 function drawDecs(){
  for(var i=0;i<DN;i++){
   var d=decs[(ring+i)%DN];
   if(d.z<.4||d.z>240)continue;
   var p=pz(d.z),y=yAt(p);if(y<hzY)continue;
+  if(S.map===1){var xa=cx+d.side*rHalf*(d.kind===1?1.2:d.kind===3?1.3:1.62)*p,sa=H*.42*p*d.sc;if(sa<2)continue;
+   if(d.kind===0)drawCypress(xa,y,sa);else if(d.kind===1)drawBollard(xa,y,sa);
+   else if(d.kind===2)drawBush(xa,y,sa);else drawLamp(xa,y,sa,d.side);
+   continue;}
   var x=cx+d.side*rHalf*(d.kind===1?1.75:1.35)*p,s=H*.42*p*d.sc;if(s<2)continue;
   if(d.kind===0)drawTree(x,y,s);
   else if(d.kind===1)drawYurt(x,y,s);
@@ -628,176 +666,7 @@ function drawGate(){
  }
 }
 
-/* === 12. ПЕРСОНАЖИ: рисуются фигурами в единицах роста === */
-var SKIN='#f6cfa8',SKIN2='#e9b98f';
-var hand={x:0,y:0},AF=0,BF=0,AN=0,BN=0;
-function leg(sw,col,shoe,sock,hx){            // бедро + голень + обувь
- var a=sw*.52,b=a*.2-.55*mx(0,-sw);
- var kx=hx+sin(a)*.19,ky=-.36+cos(a)*.19;
- var fx=kx+sin(b)*.19,fy=ky+cos(b)*.19;
- sk(col,.085);
- g.beginPath();g.moveTo(hx,-.36);g.lineTo(kx,ky);g.lineTo(fx,fy);g.stroke();
- if(sock){sk(sock,.09);g.beginPath();g.moveTo(kx+(fx-kx)*.3,ky+(fy-ky)*.3);g.lineTo(fx,fy);g.stroke();}
- fl(shoe);g.beginPath();g.ellipse(fx+.02,fy+.01,.058,.03,0,0,TAU);g.fill();
-}
-function arm(a,b,col,sx,full,cuff){                // плечо + предплечье, кисть пишется в hand
- var ex=sx+sin(a)*.15,ey=-.66+cos(a)*.15;
- hand.x=ex+sin(b)*.14;hand.y=ey+cos(b)*.14;
- if(full){sk(col,.065);g.beginPath();g.moveTo(sx,-.66);g.lineTo(ex,ey);g.lineTo(hand.x,hand.y);g.stroke();}
- else{
-  sk(SKIN,.05);g.beginPath();g.moveTo(sx,-.66);g.lineTo(ex,ey);g.lineTo(hand.x,hand.y);g.stroke();
-  sk(col,.08);g.beginPath();g.moveTo(sx,-.66);g.lineTo(sx+sin(a)*.065,-.66+cos(a)*.065);g.stroke();
- }
- if(cuff){fl(cuff);dot(ex+(hand.x-ex)*.75,ey+(hand.y-ey)*.75,.044);}   // меховая/золотая манжета
- fl(SKIN);dot(hand.x,hand.y,.036);
-}
-// mode: 0 — стоит, 1 — бежит, 2 — прыжок с поднятыми руками, 3 — машет рукой
-function armAngles(s1,mode){
- if(mode===1){AF=s1*.7;BF=AF-.75;AN=-s1*.7;BN=AN-.75;}
- else if(mode===2){AF=-2.6;BF=-2.86;AN=2.6;BN=2.86;}
- else{AF=-.12-sin(T*2.2)*.03;BF=AF+.08;
-  if(mode===3){AN=2.4+sin(T*9)*.3;BN=AN+.5;}else{AN=.12+sin(T*2.2)*.03;BN=AN-.08;}}
-}
-function eyes(y,blink,big){
- if(blink){sk('#2b2b2b',.012);g.beginPath();g.moveTo(-.062,y);g.lineTo(-.03,y);g.moveTo(.03,y);g.lineTo(.062,y);g.stroke();return;}
- fl('#2b2033');g.beginPath();g.ellipse(-.046,y,big?.02:.014,big?.026:.016,0,0,TAU);g.fill();
- g.beginPath();g.ellipse(.046,y,big?.02:.014,big?.026:.016,0,0,TAU);g.fill();
- if(big){fl('#fff');dot(-.04,y-.01,.007);dot(.052,y-.01,.007);}
-}
-// Казахский орнамент «қошқар мүйіз» — два завитка
-function ornament(x,y,r,col){
- sk(col,r*.32);g.beginPath();
- g.moveTo(x,y+r*.8);g.lineTo(x,y);g.arc(x-r*.5,y,r*.5,0,-1.5*PI,true);
- g.moveTo(x,y);g.arc(x+r*.5,y,r*.5,PI,2.5*PI,false);g.stroke();
-}
-function braid(side,sw){                      // коса с шолпы на конце
- var rx=side*.105,ry=-.86,mxp=side*.16+sw*.015,ex=side*.14+sw*.035,ey=-.5;
- sk('#1e1412',.055);g.beginPath();g.moveTo(rx,ry);g.quadraticCurveTo(mxp,-.7,ex,ey);g.stroke();
- sk('#0f0a08',.01);g.beginPath();
- for(var k=1;k<5;k++){var t=k/5,qx=(1-t)*(1-t)*rx+2*t*(1-t)*mxp+t*t*ex,qy=(1-t)*(1-t)*ry+2*t*(1-t)*-.7+t*t*ey;
-  g.moveTo(qx-.024,qy-.01);g.lineTo(qx+.024,qy+.01);}
- g.stroke();
- fl('#d7dbe3');g.beginPath();g.moveTo(ex,ey);g.lineTo(ex-.03,ey+.06);g.lineTo(ex+.03,ey+.06);g.closePath();g.fill();
- fl('#ffd35a');dot(ex,ey+.075,.014);
-}
-function drawKyz(s1,mode,ph){                 // девочка в национальном костюме
- armAngles(s1,mode);
- var sw=mode===1?sin(ph-.8):(mode===2?-.7:sin(T*2)*.25),fx=mode===1?sin(ph*2)*.015:(mode===2?.03:0);
- arm(AF,BF,'#e23f78',-.13,true,'#fff4e0');
- leg(-s1,'#f6eedc','#eadcbc',null,-.045);leg(s1,'#f6eedc','#eadcbc',null,.045);
- fl('#ff5d97');g.beginPath();g.moveTo(-.13,-.47);g.lineTo(.13,-.47);g.lineTo(.22+fx,-.27);g.lineTo(-.22-fx,-.27);g.closePath();g.fill();
- sk('#d8366f',.012);g.beginPath();for(var k=-2;k<=2;k++){g.moveTo(k*.05,-.44);g.lineTo(k*.085,-.28);}g.stroke();
- fl('#e23f78');                                       // камзол
- g.beginPath();g.moveTo(-.145,-.71);g.lineTo(.145,-.71);g.lineTo(.18,-.41);g.lineTo(-.18,-.41);g.closePath();g.fill();
- fl('#ff8ab4');g.beginPath();g.moveTo(-.055,-.71);g.lineTo(.055,-.71);g.lineTo(.035,-.42);g.lineTo(-.035,-.42);g.closePath();g.fill();
- ornament(-.11,-.52,.04,'#ffd35a');ornament(.11,-.52,.04,'#ffd35a');ornament(0,-.6,.03,'#ffd35a');
- sk('#fff4e0',.042);g.beginPath();                    // меховая опушка
- g.moveTo(-.058,-.71);g.lineTo(-.038,-.42);g.moveTo(.058,-.71);g.lineTo(.038,-.42);
- g.moveTo(-.18,-.41);g.lineTo(.18,-.41);g.stroke();
- fl(SKIN2);fr(-.024,-.76,.048,.05);
- fl('#ffd35a');dot(0,-.705,.016);
- fl('#1e1412');fr(-.128,-.9,.03,.1);fr(.098,-.9,.03,.1);
- fl(SKIN);dot(0,-.85,.12);
- braid(-1,sw);braid(1,sw);
- eyes(-.84,(T+.4)%3.3<.13,true);
- fl('rgba(255,110,140,.5)');dot(-.078,-.805,.022);dot(.078,-.805,.022);
- sk('#b0505a',.013);g.beginPath();g.arc(0,-.808,.035,.35,2.79);g.stroke();
- kyzHat(sw);
- arm(AN,BN,'#e23f78',.13,true,'#fff4e0');
-}
-function drawUl(s1,mode){                     // мальчик в шапане и тақия
- armAngles(s1,mode);
- arm(AF,BF,'#3f63d0',-.13,true,'#e7b53c');
- leg(-s1,'#3a5cc0','#24367a',null,-.05);leg(s1,'#3a5cc0','#24367a',null,.05);
- fl('#3f63d0');                                       // шапан
- g.beginPath();g.moveTo(-.15,-.71);g.lineTo(.15,-.71);g.lineTo(.175,-.33);g.lineTo(-.175,-.33);g.closePath();g.fill();
- fl('#fbf6ea');g.beginPath();g.moveTo(-.06,-.71);g.lineTo(.06,-.71);g.lineTo(.04,-.34);g.lineTo(-.04,-.34);g.closePath();g.fill();
- ornament(0,-.6,.035,'#e7b53c');
- sk('#e7b53c',.022);g.beginPath();                    // золотая кайма
- g.moveTo(-.062,-.71);g.lineTo(-.042,-.335);g.moveTo(.062,-.71);g.lineTo(.042,-.335);
- g.moveTo(-.175,-.34);g.lineTo(.175,-.34);g.stroke();
- ornament(-.11,-.44,.035,'#e7b53c');ornament(.11,-.44,.035,'#e7b53c');
- fl(SKIN2);fr(-.026,-.76,.052,.05);
- fl(SKIN);dot(0,-.85,.122);dot(-.122,-.845,.026);dot(.122,-.845,.026);
- fl('#4a2c1c');g.beginPath();g.arc(0,-.87,.128,PI,TAU);g.closePath();g.fill();
- dot(-.07,-.885,.03);dot(-.02,-.89,.032);dot(.035,-.888,.03);
- taqiya();
- eyes(-.84,(T+2.6)%3.6<.13,true);
- fl('rgba(255,120,120,.4)');dot(-.078,-.805,.02);dot(.078,-.805,.02);
- fl('#8a3a3a');g.beginPath();g.arc(0,-.81,.04,.2,2.94);g.closePath();g.fill();
- arm(AN,BN,'#3f63d0',.13,true,'#e7b53c');
-}
-function kyzHat(sw){                          // шапка с меховым околышем и пером үкі
- sk('#fff8ea',.035);g.beginPath();                    // перо үкі качается
- g.moveTo(.02,-1.18);g.quadraticCurveTo(-.05+sw*.03,-1.3,-.12+sw*.06,-1.22+abs(sw)*.02);g.stroke();
- sk('#efe2c8',.02);g.beginPath();g.moveTo(.02,-1.18);g.quadraticCurveTo(-.02+sw*.03,-1.27,-.07+sw*.05,-1.25);g.stroke();
- fl('#e23f78');g.beginPath();g.moveTo(-.095,-.95);g.lineTo(.02,-1.19);g.lineTo(.095,-.95);g.closePath();g.fill();
- ornament(.003,-1.03,.03,'#ffd35a');
- fl('#fff4e0');rr(-.15,-.99,.3,.09,.045);g.fill();     // меховой околыш
- fl('#efdfc0');dot(-.1,-.95,.012);dot(-.04,-.96,.012);dot(.03,-.95,.012);dot(.09,-.96,.012);
-}
-function taqiya(){
- fl('#3f63d0');g.beginPath();g.arc(0,-.905,.112,PI,TAU);g.closePath();g.fill();   // тақия
- fl('#e7b53c');fr(-.114,-.918,.228,.026);
- sk('#e7b53c',.01);g.beginPath();g.moveTo(-.06,-.96);g.lineTo(-.03,-.99);g.lineTo(0,-.96);g.lineTo(.03,-.99);g.lineTo(.06,-.96);g.stroke();
-}
-/* --- Вид со спины: во время забега персонаж бежит от камеры к горизонту --- */
-function legB(lift,col,shoe,hx){              // lift: 0 — нога на земле, 1 — пятка поднята к бедру
- var kx=hx*1.2,ky=-.19-lift*.04,fx=hx*1.05,fy=-lift*.2,fs=1+lift*.25;
- sk(col,.085);g.beginPath();g.moveTo(hx,-.36);g.lineTo(kx,ky);g.lineTo(fx,fy);g.stroke();
- fl(shoe);g.beginPath();g.ellipse(fx,fy+.012,.05*fs,.03*fs,0,0,TAU);g.fill();
- if(lift>.25){fl('rgba(40,30,30,.3)');g.beginPath();g.ellipse(fx,fy+.02,.038*fs,.02*lift,0,0,TAU);g.fill();}   // подошва
-}
-// Рука, согнутая в локте и отведённая от туловища; sw>0 — рука уходит вперёд (кисть выше),
-// sw<0 — назад (кисть ниже). Тёмный контур отделяет рукав от одежды того же цвета.
-function armB(sw,col,dark,sx,cuff,up){
- var d=sx<0?-1:1,ex,ey,hx,hy;
- if(up){var wg=sin(T*22)*.02;ex=sx+d*.1;ey=-.84;hx=sx+d*(.13+wg);hy=-1.02;}
- else{ex=sx+d*(.075+.015*sw);ey=-.53+sw*.03;hx=sx+d*(.06-.02*sw);hy=-.41-sw*.13;}
- sk(dark,.088);g.beginPath();g.moveTo(sx,-.67);g.lineTo(ex,ey);g.lineTo(hx,hy);g.stroke();
- sk(col,.062);g.beginPath();g.moveTo(sx,-.67);g.lineTo(ex,ey);g.lineTo(hx,hy);g.stroke();
- if(cuff){fl(cuff);dot(ex+(hx-ex)*.75,ey+(hy-ey)*.75,.044);}
- fl(SKIN);dot(hx,hy,.036);
-}
-function braidB(side,sw){                     // коса на спине
- var rx=side*.055,ry=-.8,mxp=side*.075+sw*.02,ex=side*.065+sw*.045,ey=-.46;
- sk('#1e1412',.058);g.beginPath();g.moveTo(rx,ry);g.quadraticCurveTo(mxp,-.64,ex,ey);g.stroke();
- sk('#0f0a08',.01);g.beginPath();
- for(var k=1;k<5;k++){var t=k/5,qx=(1-t)*(1-t)*rx+2*t*(1-t)*mxp+t*t*ex,qy=(1-t)*(1-t)*ry+2*t*(1-t)*-.64+t*t*ey;
-  g.moveTo(qx-.026,qy-.008);g.lineTo(qx+.026,qy+.008);}
- g.stroke();
- fl('#d7dbe3');g.beginPath();g.moveTo(ex,ey);g.lineTo(ex-.03,ey+.06);g.lineTo(ex+.03,ey+.06);g.closePath();g.fill();
- fl('#ffd35a');dot(ex,ey+.075,.014);
-}
-function drawKyzBack(ph,mode){
- var up=mode===2,s=sin(ph),lL=up?.8:mx(0,s),lR=up?.8:mx(0,-s),sw=up?0:s,fx=up?.03:sin(ph*2)*.015;
- legB(lL,'#f6eedc','#eadcbc',-.045);legB(lR,'#f6eedc','#eadcbc',.045);
- fl('#ff5d97');g.beginPath();g.moveTo(-.13,-.47);g.lineTo(.13,-.47);g.lineTo(.22+fx,-.27);g.lineTo(-.22-fx,-.27);g.closePath();g.fill();
- sk('#d8366f',.012);g.beginPath();for(var k=-2;k<=2;k++){g.moveTo(k*.05,-.44);g.lineTo(k*.085,-.28);}g.stroke();
- fl('#e23f78');                                       // камзол со спины
- g.beginPath();g.moveTo(-.145,-.71);g.lineTo(.145,-.71);g.lineTo(.18,-.41);g.lineTo(-.18,-.41);g.closePath();g.fill();
- ornament(0,-.6,.065,'#ffd35a');ornament(-.12,-.47,.03,'#ffd35a');ornament(.12,-.47,.03,'#ffd35a');
- sk('#fff4e0',.042);g.beginPath();g.moveTo(-.18,-.41);g.lineTo(.18,-.41);g.stroke();
- armB(sw,'#e23f78','#a8214f',-.155,'#fff4e0',up);armB(-sw,'#e23f78','#a8214f',.155,'#fff4e0',up);
- fl('#fff4e0');rr(-.085,-.74,.17,.045,.022);g.fill();  // меховой воротник
- fl('#1e1412');dot(0,-.85,.122);                       // затылок
- braidB(-1,sw*.6);braidB(1,sw*.6);
- kyzHat(up?-.6:sw);
-}
-function drawUlBack(ph,mode){
- var up=mode===2,s=sin(ph),lL=up?.8:mx(0,s),lR=up?.8:mx(0,-s),sw=up?0:s;
- legB(lL,'#3a5cc0','#24367a',-.05);legB(lR,'#3a5cc0','#24367a',.05);
- fl('#3f63d0');                                       // шапан со спины
- g.beginPath();g.moveTo(-.15,-.71);g.lineTo(.15,-.71);g.lineTo(.175+(up?0:sin(ph*2)*.01),-.33);g.lineTo(-.175-(up?0:sin(ph*2)*.01),-.33);g.closePath();g.fill();
- ornament(0,-.57,.07,'#e7b53c');ornament(-.11,-.42,.03,'#e7b53c');ornament(.11,-.42,.03,'#e7b53c');
- sk('#e7b53c',.022);g.beginPath();g.moveTo(-.175,-.34);g.lineTo(.175,-.34);g.stroke();
- armB(sw,'#3f63d0','#22398a',-.155,'#e7b53c',up);armB(-sw,'#3f63d0','#22398a',.155,'#e7b53c',up);
- fl('#e7b53c');rr(-.075,-.74,.15,.04,.02);g.fill();    // золотой воротник
- fl(SKIN2);fr(-.026,-.78,.052,.05);
- fl(SKIN);dot(-.122,-.845,.026);dot(.122,-.845,.026);
- fl('#4a2c1c');dot(0,-.85,.122);                       // затылок
- taqiya();
-}
+/* === 12. ПЕРСОНАЖИ: спрайт-листы, рост ≈ 1.2 условной единицы, точка привязки — ноги === */
 /* --- Батыр: персонаж из спрайт-листа img/batyr.png ---
    Кадры [x,y,w,h] в атласе; рост стоящего героя ≈ 1.2 условной единицы, точка привязки — низ кадра по центру */
 var BATYR=new Image(),BF_={front:[2,2,108,268],side1:[112,2,91,266],side2:[205,2,85,263],back:[292,2,107,263],
@@ -852,10 +721,7 @@ function drawRunner(kind,x,y,h,ph,mode,lean,jy){
  g.translate(0,-jy/h-bob);g.rotate(lean+(mode===1?sin(ph)*.035:0));
  if(spinA){g.translate(0,-.55);g.rotate(spinA);g.translate(0,.55);}
  g.lineCap='round';g.lineJoin='round';
- if(kind===2)drawBatyr(ph,mode);
- else if(kind===3)drawZhuyrik(ph,mode);
- else if(mode===1||mode===2){if(kind===0)drawKyzBack(ph,mode);else drawUlBack(ph,mode);}   // в забеге — вид со спины
- else if(kind===0)drawKyz(s1,mode,ph);else drawUl(s1,mode);
+ if(kind===0)drawBatyr(ph,mode);else drawZhuyrik(ph,mode);
  g.restore();
 }
 function drawPlayer(){
@@ -870,7 +736,7 @@ function drawPlayer(){
  if(S.hurt>0&&sin(T*38)>0)g.globalAlpha=.4;       // мигание после ошибки
  var lean=(S.lane-S.laneF)*.35;
  if(lean>.03)batyrFace=1;else if(lean<-.03)batyrFace=-1;   // спрайт смотрит в сторону перестроения
- drawRunner(S.ch,x,y,h,S.runT,jy>0?2:(S.ch>=2&&(S.deadT>0||S.hurt>.85)?4:1),lean,jy);
+ drawRunner(S.ch,x,y,h,S.runT,jy>0?2:((S.deadT>0||S.hurt>.85)?4:1),lean,jy);
  g.globalAlpha=1;
 }
 
@@ -1095,14 +961,19 @@ function drawStart(){
  var NC=NAMES.length,cols=W>H*1.1||NC<=3?NC:2,rows=Math.ceil(NC/cols),gap=mn(W*.03,18),k;
  var bh=mn(H*.085,64,U*.15),bw=mn(W*.62,300);
  var fs=fit('Телефон: свайп ← → немесе экранды бас, ↑ — секіру',mn(W*.034,H*.024,16),700,W*.9);
- var avail=H-y-(bh*1.6+fs*5.6+mx(16,H*.035));
+ var mh=mn(H*.1,96,U*.2),mlab=ts*.42;              // ряд выбора карты
+ var avail=H-y-(bh*1.6+fs*5.6+mx(16,H*.035)+mh+mlab+mx(10,H*.02));
  var cw=mn((W-gap*(cols+1))/cols,210),chh=mn(cw*1.3,(avail-gap*(rows-1))/rows);
  cw=mn(cw,chh/1.05);
  var gx=W/2-(cols*cw+(cols-1)*gap)/2,slide=(1-eob(cl(S.scrT*2.2)))*H*.15;
  g.save();g.translate(0,slide);
  for(k=0;k<NC;k++)drawCard(k,gx+(k%cols)*(cw+gap),y+Math.floor(k/cols)*(chh+gap),cw,chh);
  g.restore();
- y+=rows*chh+(rows-1)*gap+mx(16,H*.035);
+ y+=rows*chh+(rows-1)*gap+mx(10,H*.02);
+ center();fl('#ffd84d');g.font=F(ts*.26,900);g.fillText('Картаны таңда',W/2,y+mlab*.4);y+=mlab;
+ var mw=mn(mh*1.75,(W-gap*3)/2),mx0=W/2-mw-gap/2;
+ for(k=0;k<MAPS.length;k++)drawMapCard(k,mx0+k*(mw+gap),y,mw,mh);
+ y+=mh+mx(16,H*.035);
  ui.btn.x=(W-bw)/2;ui.btn.y=y;ui.btn.w=bw;ui.btn.h=bh;
  drawBtn(ui.btn,'Бастау','#ffd166','#ff9f1c','#c96a0a',!S.help);
  y+=bh*1.35;
@@ -1111,6 +982,26 @@ function drawStart(){
  pill(hR.x,hR.y,hw,hh2);center();fl('#fff');g.fillText(hl,W/2,y+hh2/2+1);
  g.globalAlpha=1;
  if(S.help)drawHelp();
+}
+// Карточка карты: миниатюра + название
+function drawMapCard(i,x,y,w,h){
+ var sel=S.map===i,r=h*.16,R=ui.maps[i];R.x=x;R.y=y;R.w=w;R.h=h;
+ fl('rgba(0,0,0,.28)');rr(x,y+h*.05,w,h,r);g.fill();
+ g.save();rr(x,y,w,h,r);g.clip();
+ if(i===1&&AST.complete&&AST.naturalWidth){var iw=AST.naturalWidth,ih=AST.naturalHeight,sc=mx(w/iw,h/ih);
+  g.drawImage(AST,x+(w-iw*sc)/2,y+h-ih*sc,iw*sc,ih*sc);}
+ else{var sg=g.createLinearGradient(0,y,0,y+h);sg.addColorStop(0,'#2f8fdc');sg.addColorStop(.55,'#bfe6f7');sg.addColorStop(.56,'#8fcb68');sg.addColorStop(1,'#6aae70');
+  fl(sg);fr(x,y,w,h);fl('#a9bfdc');g.beginPath();g.moveTo(x,y+h*.56);g.lineTo(x+w*.25,y+h*.22);g.lineTo(x+w*.5,y+h*.56);
+  g.lineTo(x+w*.72,y+h*.3);g.lineTo(x+w,y+h*.56);g.fill();
+  fl('#d6cfbd');g.beginPath();g.moveTo(x+w*.47,y+h*.56);g.lineTo(x+w*.53,y+h*.56);g.lineTo(x+w*.78,y+h);g.lineTo(x+w*.22,y+h);g.fill();
+  drawYurt(x+w*.14,y+h*.8,h*.5);}
+ var lg=g.createLinearGradient(0,y+h*.55,0,y+h);lg.addColorStop(0,'rgba(0,0,0,0)');lg.addColorStop(1,'rgba(0,0,0,.6)');
+ fl(lg);fr(x,y+h*.55,w,h*.45);
+ center();fl('#fff');g.font=F(fit(MAPS[i],h*.2,900,w*.9),900);g.fillText(MAPS[i],x+w/2,y+h*.84);
+ g.restore();
+ rr(x,y,w,h,r);sk(sel?'#ffd84d':'rgba(255,255,255,.5)',sel?mx(3,h*.04):1.5);g.stroke();
+ if(sel){var br=h*.1,bx=x+w-br*1.5,by=y+br*1.5;fl('#2bb35a');dot(bx,by,br);sk('#fff',br*.3);g.lineCap='round';g.lineJoin='round';
+  g.beginPath();g.moveTo(bx-br*.45,by);g.lineTo(bx-br*.1,by+br*.38);g.lineTo(bx+br*.5,by-br*.35);g.stroke();}
 }
 /* --- Окно «Қалай ойнау»: правила с иконками --- */
 var HELP=[['gate','Сұрақты оқы — дұрыс сөз жазылған қақпадан өт'],
@@ -1274,10 +1165,11 @@ function draw(){
  updPal();
  g.save();
  if(S.shake>0){var m=S.shake*16;g.translate((rnd()-.5)*m,(rnd()-.5)*m);}
- drawSky();
- mountains(PK1,.08,mn(U*.38,hzY*.7),P.mF,true);
- mountains(PK2,.16,mn(U*.26,hzY*.5),P.mN,false);
- hills(.35,.5,P.hF);hills(.6,.34,P.hN);haze();
+ if(S.map===1)drawAstanaBg();
+ else{drawSky();
+  mountains(PK1,.08,mn(U*.38,hzY*.7),P.mF,true);
+  mountains(PK2,.16,mn(U*.26,hzY*.5),P.mN,false);
+  hills(.35,.5,P.hF);hills(.6,.34,P.hN);haze();}
  drawRoad();drawDecs();
  sortObjs();var gz=gate.on?gate.z:PLR_Z;
  drawObjs(gz,1e9);drawGate();drawObjs(PLR_Z,gz);
@@ -1302,8 +1194,8 @@ window.addEventListener('keydown',function(e){
  if(S.screen==='start'&&(k==='h'||k==='H'||k==='?'||k==='р'||k==='Р')){openHelp();return;}
  if(k==='ArrowLeft'||k==='a'||k==='A'||k==='ф'||k==='Ф'){if(S.screen==='start')selectChar((S.ch+NAMES.length-1)%NAMES.length);else if(S.screen==='mode')modeStep(-1);else move(-1);e.preventDefault();}
  else if(k==='ArrowRight'||k==='d'||k==='D'||k==='в'||k==='В'){if(S.screen==='start')selectChar((S.ch+1)%NAMES.length);else if(S.screen==='mode')modeStep(1);else move(1);e.preventDefault();}
- else if(k==='ArrowUp'||k==='w'||k==='W'||k==='ц'||k==='Ц'){if(S.screen==='mode')modeStep(-1);else jump();e.preventDefault();}
- else if(k==='ArrowDown'||k==='s'||k==='S'||k==='ы'||k==='Ы'){if(S.screen==='mode')modeStep(1);e.preventDefault();}
+ else if(k==='ArrowUp'||k==='w'||k==='W'||k==='ц'||k==='Ц'){if(S.screen==='mode')modeStep(-1);else if(S.screen==='start')selectMap((S.map+MAPS.length-1)%MAPS.length);else jump();e.preventDefault();}
+ else if(k==='ArrowDown'||k==='s'||k==='S'||k==='ы'||k==='Ы'){if(S.screen==='mode')modeStep(1);else if(S.screen==='start')selectMap((S.map+1)%MAPS.length);e.preventDefault();}
  else if(k>='1'&&k<='4'){if(S.screen==='mode')startGame(+k-1);}
  else if(k===' '||k==='Enter'){
   if(S.screen==='start')toModes();
@@ -1326,6 +1218,7 @@ cv.addEventListener('pointerup',function(e){
  if(inRect(sndBtn,x,y,6)){toggleSnd();return;}   // короткий тап
  if(S.screen==='start'){
   if(inRect(ui.help,x,y,6)){openHelp();return;}
+  for(var mi=0;mi<MAPS.length;mi++)if(inRect(ui.maps[mi],x,y,4)){selectMap(mi);return;}
   for(var i=0;i<NAMES.length;i++)if(inRect(ui.cards[i],x,y,4)){selectChar(i);return;}
   toModes();return;
  }
