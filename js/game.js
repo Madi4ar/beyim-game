@@ -869,6 +869,7 @@ function drawSndBtn(){
  var x=sndBtn.x+r,y=sndBtn.y+r;
  fl('rgba(12,24,52,.55)');dot(x,y,r);
  sk('rgba(255,255,255,.35)',1.5);g.stroke();
+ x-=r*.15;                                     // рисунок занимает от -0.42r до +0.74r — центрируем в круге
  fl('#fff');g.beginPath();
  g.moveTo(x-r*.42,y-r*.17);g.lineTo(x-r*.18,y-r*.17);g.lineTo(x+r*.06,y-r*.45);
  g.lineTo(x+r*.06,y+r*.45);g.lineTo(x-r*.18,y+r*.17);g.lineTo(x-r*.42,y+r*.17);
