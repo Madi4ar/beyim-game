@@ -2,6 +2,8 @@
 'use strict';
 
 // Наборы вопросов: мақал-мәтелдер (бесконечный забег) и три уровня фразеологизмов
+// Наборы по языкам: по 4 в группе — пословицы (бесконечный забег) и три уровня фразеологизмов
+var LANGS=['Қазақ тілі','Русский язык'],GRP=['Фразеологизмдер','Фразеологизмы'];
 var SETS=[
  {name:'Мақал-мәтелдер',sub:PRV.length+' мақал • шексіз',items:PRV,endless:true,spd:13,key:'mm_best',
   miss:'Қателескен мақалдар:',c:['#7fc8ff','#3a8de0','#22609e'],best:0,stars:0},
@@ -10,8 +12,19 @@ var SETS=[
  {name:'Орташа',sub:F2.length+' фразеологизм',items:F2,endless:false,spd:16,key:'mm_best_f2',
   miss:'Қателескен фразеологизмдер:',c:['#ffd166','#ff9f1c','#c96a0a'],best:0,stars:0},
  {name:'Күрделі',sub:F3.length+' фразеологизм',items:F3,endless:false,spd:19,key:'mm_best_f3',
-  miss:'Қателескен фразеологизмдер:',c:['#ff8a8a','#e0403a','#9e2420'],best:0,stars:0}
+  miss:'Қателескен фразеологизмдер:',c:['#ff8a8a','#e0403a','#9e2420'],best:0,stars:0},
+ {name:'Пословицы',sub:RPRV.length+' пословиц • бесконечно',items:RPRV,endless:true,spd:13,key:'mm_best_ru',
+  miss:'Ошибки в пословицах:',c:['#7fc8ff','#3a8de0','#22609e'],best:0,stars:0},
+ {name:'Лёгкий',sub:RF1.length+' фразеологизмов',items:RF1,endless:false,spd:13,key:'mm_best_rf1',
+  miss:'Ошибки во фразеологизмах:',c:['#8be07a','#3fae4a','#2a7a32'],best:0,stars:0},
+ {name:'Средний',sub:RF2.length+' фразеологизмов',items:RF2,endless:false,spd:16,key:'mm_best_rf2',
+  miss:'Ошибки во фразеологизмах:',c:['#ffd166','#ff9f1c','#c96a0a'],best:0,stars:0},
+ {name:'Сложный',sub:RF3.length+' фразеологизмов',items:RF3,endless:false,spd:19,key:'mm_best_rf3',
+  miss:'Ошибки во фразеологизмах:',c:['#ff8a8a','#e0403a','#9e2420'],best:0,stars:0}
 ];
+for(var si0=0;si0<SETS.length;si0++){var ru0=si0>=4;SETS[si0].lang=ru0?1:0;
+ SETS[si0].cat='Фразеологизм';SETS[si0].pass=ru0?'Уровень пройден':'Деңгей өтілді';}
+function grpBase(){return Math.floor(S.modeSel/4)*4;}
 
 /* === 2. СОСТОЯНИЕ И ГЕОМЕТРИЯ ПЕРСПЕКТИВЫ === */
 var cv=document.getElementById('c'),g=cv.getContext('2d');
@@ -52,7 +65,7 @@ var SL=[];for(i=0;i<26;i++)SL.push({a:rnd()*TAU,o:rnd(),l:.06+rnd()*.12});
 
 // Интерфейсные зоны нажатия (обновляются при отрисовке)
 var R0=function(){return{x:0,y:0,w:0,h:0};};
-var ui={btn:R0(),btn2:R0(),cards:[R0(),R0()],modes:[R0(),R0(),R0(),R0()],back:R0(),help:R0(),helpOk:R0(),maps:[R0(),R0()],hx:[0,0,0],hy:0};
+var ui={btn:R0(),btn2:R0(),cards:[R0(),R0()],modes:[R0(),R0(),R0(),R0()],tabs:[R0(),R0()],back:R0(),help:R0(),helpOk:R0(),maps:[R0(),R0()],hx:[0,0,0],hy:0};
 var MAPS=['Дала','Түнгі Астана'];
 var NAMES=['Батыр','Жүйрік қыз'],ROLES=['ою-өрнекті күртеше','ою-өрнекті күртеше'];
 
@@ -232,6 +245,7 @@ function loadSave(){
    st.best=parseInt(localStorage.getItem(st.key),10)||0;st.stars=parseInt(localStorage.getItem(st.key+'_s'),10)||0;}
   var s=localStorage.getItem('mm_snd');if(s!==null)snd=(s==='1');
   var mp=parseInt(localStorage.getItem('mm_map'),10);if(mp>=0&&mp<MAPS.length)S.map=mp;
+  if(localStorage.getItem('mm_lang')==='1')S.modeSel=4;
   var c=localStorage.getItem('mm_hero');c=parseInt(c,10);if(c>=0&&c<NAMES.length)S.ch=c;
   S.coinTotal=parseInt(localStorage.getItem('mm_coins'),10)||0;
   if(!localStorage.getItem('mm_help'))S.help=true;}catch(e){}   // при первом запуске — сразу инструкция
@@ -305,7 +319,7 @@ function gameOver(won){
  S.screen='over';S.scrT=0;S.starSnd=0;S.won=!!won;
  // звёзды: в уровне — за число оставшихся жизней, в бесконечном — за верные ответы
  S.earned=st.endless?(S.correct>=15?3:S.correct>=8?2:S.correct>=3?1:0):(won?S.lives:0);
- S.nextSet=(won&&!st.endless&&S.set+1<SETS.length)?S.set+1:-1;
+ S.nextSet=(won&&!st.endless&&S.set%4<3)?S.set+1:-1;   // следующий уровень — в том же языке
  S.coinTotal+=S.coins;saveCoins();
  S.newBest=S.score>st.best;
  if(S.newBest){st.best=S.best=S.score;}
@@ -638,6 +652,24 @@ function drawObjs(lo,hi){                     // объекты с lo < z <= hi
 
 /* === 11. ВОРОТА С ТРЕМЯ ВАРИАНТАМИ СЛОВ === */
 var SCOL=[['#ff8a5c','#e0502e'],['#5ec0f5','#2383c9'],['#7ad860','#3f9e33']],GREF=64;   // эталонный размер шрифта табличек
+// Раскладка слова на табличке: 1–3 строки, выбирается вариант с самым крупным шрифтом.
+// Ширины меряются эталонным шрифтом один раз и кэшируются по слову.
+var SIGNC={};
+function signSplits(w){
+ var ws=w.split(' '),res=[[w]],n=ws.length,a,b;
+ for(a=1;a<n;a++)res.push([ws.slice(0,a).join(' '),ws.slice(a).join(' ')]);
+ for(a=1;a<n;a++)for(b=a+1;b<n;b++)res.push([ws.slice(0,a).join(' '),ws.slice(a,b).join(' '),ws.slice(b).join(' ')]);
+ return res;
+}
+function signLayout(w,sw,sh){
+ var c=SIGNC[w];
+ if(!c){g.font=F(GREF,900);c=SIGNC[w]=signSplits(w).map(function(ls){
+  var m=0;for(var k=0;k<ls.length;k++)m=mx(m,g.measureText(ls[k]).width);return{lines:ls,w:m};});}
+ var best=c[0],bf=0;
+ for(var k=0;k<c.length;k++){var n=c[k].lines.length,f=mn(sh*(n===1?.54:n===2?.38:.28),sw*.88*GREF/c[k].w);
+  if(f>bf*1.04){bf=f;best=c[k];}}             // лишняя строка — только если заметно крупнее
+ return{lines:best.lines,fs:bf};
+}
 function drawGate(){
  if(!gate.on||gate.z<.3||gate.z>260)return;
  var p=pz(gate.z),gy=yAt(p);if(gy<hzY)return;
@@ -673,12 +705,13 @@ function drawGate(){
   sk(sel&&near>0?'#ffe14d':'rgba(255,255,255,.95)',mx(1,sh*(sel&&near>0?.09:.06)));g.stroke();
   fl('rgba(255,255,255,.22)');rr(-sw/2+sh*.12,by+sh*.08,sw-sh*.24,sh*.3,sh*.15);g.fill();
   // текст рисуется эталонным шрифтом и плавно масштабируется: целые px у мелкого шрифта давали дрожание
-  g.font=F(GREF,900);var tw=g.measureText(gate.words[i]).width,fs=mn(sh*.54,sw*.88*GREF/tw);
+  var lay=signLayout(gate.words[i],sw,sh),fs=lay.fs,ls=lay.lines,lh=GREF*1.1;
   if(fs>=2.5){
    g.save();g.globalAlpha*=cl((fs-2.5)/5);       // вдали текст проявляется, а не выскакивает
-   g.translate(0,by+sh/2);g.scale(fs/GREF,fs/GREF);
-   fl('rgba(0,0,0,.25)');g.fillText(gate.words[i],GREF*.05,GREF*.1);
-   fl('#fff');g.fillText(gate.words[i],0,GREF*.04);
+   g.translate(0,by+sh/2);g.scale(fs/GREF,fs/GREF);g.font=F(GREF,900);
+   for(var li=0;li<ls.length;li++){var ly=(li-(ls.length-1)/2)*lh;
+    fl('rgba(0,0,0,.25)');g.fillText(ls[li],GREF*.05,ly+GREF*.1);
+    fl('#fff');g.fillText(ls[li],0,ly+GREF*.04);}
    g.restore();
   }
   g.restore();
@@ -1118,17 +1151,24 @@ function drawMode(){
  overlay(.6,.4);
  g.globalAlpha=cl(S.scrT*3);
  var ts=fit('Санатты таңда',mn(W*.1,H*.065,56),900,W*.86),y=mx(ts*.9,H*.09),k,j;
- titleText('Санатты таңда',y,ts,'#ffffff','#bfe4ff',0);y+=ts*.95;
+ titleText('Санатты таңда',y,ts,'#ffffff','#bfe4ff',0);y+=ts*.75;
+ var gb=grpBase(),th=mn(mx(H*.06,30),44),tw=mn(W*.42,230),tg=mn(W*.03,12);   // вкладки языков
+ for(k=0;k<2;k++){var tr=ui.tabs[k],on=gb===k*4;tr.x=W/2-tw-tg/2+k*(tw+tg);tr.y=y;tr.w=tw;tr.h=th;
+  if(on){var tgr=g.createLinearGradient(0,y,0,y+th);tgr.addColorStop(0,'#fff3c4');tgr.addColorStop(1,'#ffc94d');fl(tgr);}
+  else fl('rgba(12,24,52,.55)');
+  rr(tr.x,y,tw,th,th/2);g.fill();sk(on?'#ff9f1c':'rgba(255,255,255,.35)',on?2.5:1.5);g.stroke();
+  center();fl(on?'#1d3557':'#fff');g.font=F(fit(LANGS[k],th*.42,900,tw*.86),900);g.fillText(LANGS[k],tr.x+tw/2,y+th/2+1);}
+ y+=th+mn(H*.025,14);
  var bw=mn(W*.88,480),bh=mn(H*.1,72,U*.18),gp=bh*.3,x=(W-bw)/2,y0;
  if(LAND){bw=mn((W-SA.l-SA.r)*.44,420);gp=mn(H*.04,16);    // альбом: сетка 2×2
   bh=mn(76,(H-y-gp*3-mx(12,H*.03))/2.75);x=W/2-bw-gp/2;}
- else{var need=bh*4+gp*4+bh*.6+bh*.75,room=H-y-mx(12,H*.03);
+ else{var need=bh*4+gp*4+bh*.6+bh*.75,room=H-y-mx(12,H*.03)-SA.b;
   if(need>room){var f=room/need;bh*=f;gp*=f;}}
  y0=y;
- for(k=0;k<SETS.length;k++){
+ for(k=0;k<4;k++){
   if(LAND){x=W/2-bw-gp/2+(k%2)*(bw+gp);y=y0+Math.floor(k/2)*(bh+gp);}
-  else if(k===1){center();fl('#ffd84d');g.font=F(bh*.32,900);g.fillText('Фразеологизмдер',W/2,y+bh*.28);y+=bh*.6;}
-  var st=SETS[k],r=ui.modes[k],e=eob(cl(S.scrT*3.5-k*.2)),sel=k===S.modeSel;
+  else if(k===1){center();fl('#ffd84d');g.font=F(bh*.32,900);g.fillText(GRP[gb/4],W/2,y+bh*.28);y+=bh*.6;}
+  var st=SETS[gb+k],r=ui.modes[k],e=eob(cl(S.scrT*3.5-k*.2)),sel=gb+k===S.modeSel;
   r.x=x;r.y=y;r.w=bw;r.h=bh;
   g.save();g.translate((1-e)*W*.5,0);
   if(sel){fl('rgba(255,255,255,'+(.55+sin(T*5)*.25).toFixed(3)+')');rr(x-5,y-5,bw+10,bh+10,(bh+10)/2);g.fill();}
@@ -1166,7 +1206,7 @@ function drawOver(){
  var y=top+Hh*.075,st=SETS[S.set];
  fl(S.won?'#2e9d4a':'#e0403a');g.font=F(mn(w*.085,Hh*.058),900);g.fillText(S.won?'Жарайсың!':'Ойын аяқталды',CX,y);
  y+=Hh*.055;fl('#7a8aa0');g.font=F(mn(w*.036,Hh*.026),800);
- g.fillText(st.endless?st.name:(S.won?'Деңгей өтілді • ':'')+'Фразеологизм • '+st.name,CX,y);
+ g.fillText(st.endless?st.name:(S.won?st.pass+' • ':'')+st.cat+' • '+st.name,CX,y);
  y+=Hh*.085;
  var sr=mn(w*.07,Hh*.048),earned=S.earned;
  for(k=0;k<3;k++){                                 // звёзды появляются по очереди
@@ -1253,7 +1293,9 @@ function draw(){
 }
 
 /* === 16. УПРАВЛЕНИЕ: клавиатура, свайпы, тапы === */
-function modeStep(d){S.modeSel=(S.modeSel+d+SETS.length)%SETS.length;sfxMove();}
+function modeStep(d){var b=grpBase();S.modeSel=b+(S.modeSel-b+d+4)%4;sfxMove();}
+function switchLang(l){if(grpBase()===l*4)return;S.modeSel=l*4+S.modeSel%4;sfxSelect();
+ try{localStorage.setItem('mm_lang',String(l));}catch(e){}}
 function inRect(r,x,y,p){return x>=r.x-p&&x<=r.x+r.w+p&&y>=r.y-p&&y<=r.y+r.h+p;}
 window.addEventListener('keydown',function(e){
  var k=e.key;ensureAudio();
@@ -1263,7 +1305,8 @@ window.addEventListener('keydown',function(e){
  else if(k==='ArrowRight'||k==='d'||k==='D'||k==='в'||k==='В'){if(S.screen==='start')selectChar((S.ch+1)%NAMES.length);else if(S.screen==='mode')modeStep(1);else move(1);e.preventDefault();}
  else if(k==='ArrowUp'||k==='w'||k==='W'||k==='ц'||k==='Ц'){if(S.screen==='mode')modeStep(-1);else if(S.screen==='start')selectMap((S.map+MAPS.length-1)%MAPS.length);else jump();e.preventDefault();}
  else if(k==='ArrowDown'||k==='s'||k==='S'||k==='ы'||k==='Ы'){if(S.screen==='mode')modeStep(1);else if(S.screen==='start')selectMap((S.map+1)%MAPS.length);e.preventDefault();}
- else if(k>='1'&&k<='4'){if(S.screen==='mode')startGame(+k-1);}
+ else if(k>='1'&&k<='4'){if(S.screen==='mode')startGame(grpBase()+(+k-1));}
+ else if(k==='Tab'){if(S.screen==='mode'){switchLang(grpBase()?0:1);e.preventDefault();}}
  else if(k===' '||k==='Enter'){
   if(S.screen==='start')toModes();
   else if(S.screen==='mode')startGame(S.modeSel);
@@ -1290,7 +1333,8 @@ cv.addEventListener('pointerup',function(e){
   toModes();return;
  }
  if(S.screen==='mode'){
-  for(var j=0;j<SETS.length;j++)if(inRect(ui.modes[j],x,y,4)){startGame(j);return;}
+  for(var j=0;j<2;j++)if(inRect(ui.tabs[j],x,y,4)){switchLang(j);return;}
+  for(j=0;j<4;j++)if(inRect(ui.modes[j],x,y,4)){startGame(grpBase()+j);return;}
   if(inRect(ui.back,x,y,6))toMenu();
   return;
  }
